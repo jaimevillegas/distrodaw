@@ -228,4 +228,14 @@ mod tests {
         watcher.check();
         assert!(watcher.check().is_none(), "sin archivo no se recarga nada");
     }
+
+    #[test]
+    fn every_example_patch_in_the_repo_is_valid() {
+        let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../patches");
+        let files = list(&dir).unwrap();
+        assert!(files.len() >= 5, "faltan patches de ejemplo en {}", dir.display());
+        for file in files {
+            load(&file).unwrap_or_else(|e| panic!("patch de ejemplo inválido: {e}"));
+        }
+    }
 }

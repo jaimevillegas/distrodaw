@@ -1,0 +1,13 @@
+name = "Pad"
+
+[oscillator]
+waveform = "triangle"
+
+[envelope]
+attack = 0.6
+decay = 0.8
+sustain = 0.8
+release = 1.5
+
+[output]
+volume = 0.5

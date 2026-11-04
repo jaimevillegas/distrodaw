@@ -1,0 +1,13 @@
+name = "Lead"
+
+[oscillator]
+waveform = "saw"
+
+[envelope]
+attack = 0.02
+decay = 0.15
+sustain = 0.75
+release = 0.25
+
+[output]
+volume = 0.45

@@ -1,0 +1,13 @@
+name = "Organ"
+
+[oscillator]
+waveform = "sine"
+
+[envelope]
+attack = 0.005
+decay = 0.01
+sustain = 1.0
+release = 0.06
+
+[output]
+volume = 0.55
