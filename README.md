@@ -15,6 +15,9 @@ Hito 2 implementado: sinte polifónico de 8 voces con ADSR y parámetros con ID,
 controlado por teclado MIDI (`distrodaw play`). Probado con un puerto MIDI virtual y
 con un teclado USB real en la Pi 2; pendiente medir la latencia real. Ver [docs/HITO2.md](docs/HITO2.md).
 
+Hito 3 en curso: interfaz de terminal con pantallas Play y Synth (`distrodaw`), manejada
+con teclado; el joystick queda pendiente. Ver [docs/HITO3.md](docs/HITO3.md).
+
 ## Estructura
 
 | Crate | Función |
@@ -33,6 +36,7 @@ cargo test -p distrodaw-engine
 cargo run --release -p distrodaw -- devices
 cargo run --release -p distrodaw -- midi-ports
 cargo run --release -p distrodaw -- play --monitor
+cargo run --release -p distrodaw            # interfaz de terminal
 cargo run --release -p distrodaw -- bench --buffer 128 --rate 48000 --voices 16 --seconds 5
 ```
 
@@ -60,7 +64,7 @@ está en `Cross.toml`.
 
 - [x] 0. Oscilador sonando en PC
 - [x] 1. Compilar a Pi 2 y medir latencia/CPU con el Volt 2
-- [ ] 2. Teclado MIDI → sinte de 8 voces con ADSR
+- [x] 2. Teclado MIDI → sinte de 8 voces con ADSR
 - [ ] 3. TUI (Play, Synth, Seq, Files)
 - [ ] 4. Patches desde archivo (TOML)
 - [ ] 5. Secuenciador tipo tracker y grabación a .mid
