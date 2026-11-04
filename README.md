@@ -18,6 +18,10 @@ con un teclado USB real en la Pi 2; pendiente medir la latencia real. Ver [docs/
 Hito 3 completado: interfaz de terminal con pantallas Play y Synth (`distrodaw`), manejada
 con teclado (el joystick queda como opcional para el futuro). Ver [docs/HITO3.md](docs/HITO3.md).
 
+Hito 4 implementado: sintes como patches en TOML (`patches/`), con recarga en caliente y
+pantalla Files (F5) para cargar y guardar. Pendiente de probar a oído. Ver
+[docs/HITO4.md](docs/HITO4.md).
+
 ## Estructura
 
 | Crate | Función |
@@ -37,6 +41,7 @@ cargo run --release -p distrodaw -- devices
 cargo run --release -p distrodaw -- midi-ports
 cargo run --release -p distrodaw -- play --monitor
 cargo run --release -p distrodaw            # interfaz de terminal
+cargo run --release -p distrodaw -- tui --patch patches/pad.toml   # con un patch que se recarga al guardar
 cargo run --release -p distrodaw -- bench --buffer 128 --rate 48000 --voices 16 --seconds 5
 ```
 
