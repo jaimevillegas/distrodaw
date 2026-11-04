@@ -18,6 +18,8 @@ use std::time::{Duration, Instant};
 const FRAME: Duration = Duration::from_millis(40);
 /// Cada cuánto se vuelve a leer la lista de patches de la carpeta.
 const REFRESH_FILES: Duration = Duration::from_secs(1);
+/// El medidor se actualiza cada tantos cuadros (12,5 Hz con cuadros de 40 ms).
+const METER_EVERY: u32 = 2;
 /// Cuánto pesa la medida nueva de carga de CPU en la que se muestra (0 a 1).
 const CPU_SMOOTHING: f32 = 0.1;
 /// Nombre del patch sin nombre propio; al guardarlo se usa el del archivo.
@@ -101,6 +103,7 @@ pub fn run(audio_args: &AudioArgs, args: &TuiArgs) -> Result<()> {
 
     let mut tui = Tui::enter(palette)?;
     let mut last_refresh = Instant::now();
+    let mut frame_number: u32 = 0;
     while !state.quit {
         while let Ok(msg) = session.midi_rx.pop() {
             if let Midi::NoteOn { note, .. } = msg {
@@ -109,7 +112,12 @@ pub fn run(audio_args: &AudioArgs, args: &TuiArgs) -> Result<()> {
         }
         state.params = session.shared.params();
         state.voices = session.shared.voices();
-        state.set_peak(session.shared.take_peak());
+        // El pico se acumula entre lecturas, así que leerlo cada dos cuadros no pierde nada y
+        // evita redibujar el medidor a cada cuadro.
+        if frame_number % METER_EVERY == 0 {
+            state.set_peak(session.shared.take_peak());
+        }
+        frame_number = frame_number.wrapping_add(1);
         match session.check_audio() {
             Some(AudioEvent::Lost) => {
                 state.audio_lost = true;
