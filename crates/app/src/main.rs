@@ -5,6 +5,7 @@ mod bench;
 mod midi;
 mod patches;
 mod play;
+mod rt;
 mod session;
 mod shared;
 mod stats;

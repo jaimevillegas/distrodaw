@@ -1,7 +1,7 @@
 //! Banco de pruebas (Hito 1): N sinusoides simultáneas y métricas del callback.
 
 use crate::audio::{self, AudioArgs};
-use crate::stats::AudioStats;
+use crate::stats::{AudioStats, Realtime};
 use anyhow::Result;
 use clap::Args;
 use distrodaw_engine::{Event, ParamId, SineBank, Synth, VOICES};
@@ -93,7 +93,7 @@ pub fn run(audio_args: &AudioArgs, args: &BenchArgs) -> Result<()> {
     let r = stats.take_report(rate);
     let buffer = output.info.device_buffer.unwrap_or(r.frames_per_callback);
     println!(
-        "RESUMEN callbacks={} buffer_frames={} buffer_ms={:.2} callback_frames={} carga_media={:.1}% pico={:.1}% pico_ms={:.2} hueco_max_ms={:.2} retrasos={} plazos_perdidos={} xruns={} errores={}",
+        "RESUMEN callbacks={} buffer_frames={} buffer_ms={:.2} callback_frames={} carga_media={:.1}% pico={:.1}% pico_ms={:.2} hueco_max_ms={:.2} retrasos={} plazos_perdidos={} xruns={} errores={} tiempo_real={}",
         r.callbacks,
         buffer,
         buffer_ms(buffer),
@@ -106,8 +106,18 @@ pub fn run(audio_args: &AudioArgs, args: &BenchArgs) -> Result<()> {
         r.misses,
         r.xruns,
         r.stream_errors,
+        realtime_text(r.realtime),
     );
     Ok(())
+}
+
+fn realtime_text(rt: Realtime) -> String {
+    match rt {
+        Realtime::Pending => "pendiente".into(),
+        Realtime::Off => "desactivado".into(),
+        Realtime::Active(p) => format!("fifo{p}"),
+        Realtime::Denied(errno) => format!("denegado(errno {errno})"),
+    }
 }
 
 fn chord_events(waveform: f32) -> [Event; VOICES + 2] {

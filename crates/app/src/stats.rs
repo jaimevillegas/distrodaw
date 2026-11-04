@@ -1,12 +1,28 @@
 //! Métricas del callback de audio. Todo son atómicos: el hilo de audio solo
 //! escribe y el hilo principal lee, sin locks ni reservas de memoria.
 
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering::Relaxed};
+use std::sync::atomic::{AtomicBool, AtomicI32, AtomicU64, Ordering::Relaxed};
 use std::time::{Duration, Instant};
 
 /// Un callback se considera «retrasado» si llega después de más de este
 /// múltiplo de su periodo: el hilo de audio no se ejecutó a tiempo.
 const LATE_FACTOR: u64 = 2;
+
+/// Estado de la prioridad de tiempo real del hilo de audio.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Realtime {
+    /// Aún no ha arrancado el hilo de audio.
+    Pending,
+    /// Desactivado con `--rt-priority 0`.
+    Off,
+    /// Activo con esta prioridad `SCHED_FIFO`.
+    Active(i32),
+    /// El sistema lo denegó (código `errno`, normalmente `EPERM`).
+    Denied(i32),
+}
+
+/// Codificación en un atómico: 0 pendiente, `i32::MIN` desactivado, >0 activo, <0 `-errno`.
+const RT_OFF: i32 = i32::MIN;
 
 /// Origen de tiempos para medir los intervalos entre callbacks.
 struct Base(Instant);
@@ -27,6 +43,7 @@ pub struct AudioStats {
     interval_max_gap_ns: AtomicU64,
     /// Callbacks que llegaron con más de `LATE_FACTOR` periodos de retraso.
     late: AtomicU64,
+    realtime: AtomicI32,
     callbacks: AtomicU64,
     total_frames: AtomicU64,
     last_frames: AtomicU64,
@@ -71,6 +88,7 @@ pub struct Report {
     pub max_gap_ms: f64,
     /// Mayor intervalo entre callbacks desde el informe anterior, en milisegundos.
     pub interval_max_gap_ms: f64,
+    pub realtime: Realtime,
 }
 
 impl AudioStats {
@@ -104,6 +122,25 @@ impl AudioStats {
 
     pub fn record_stream_error(&self) {
         self.stream_errors.fetch_add(1, Relaxed);
+    }
+
+    /// El hilo de audio anota si consiguió la prioridad de tiempo real.
+    pub fn record_realtime(&self, priority: i32, outcome: &std::io::Result<()>) {
+        let value = match outcome {
+            _ if priority <= 0 => RT_OFF,
+            Ok(()) => priority,
+            Err(e) => -e.raw_os_error().unwrap_or(1).max(1),
+        };
+        self.realtime.store(value, Relaxed);
+    }
+
+    pub fn realtime(&self) -> Realtime {
+        match self.realtime.load(Relaxed) {
+            0 => Realtime::Pending,
+            RT_OFF => Realtime::Off,
+            p if p > 0 => Realtime::Active(p),
+            e => Realtime::Denied(-e),
+        }
     }
 
     pub fn record_xrun(&self) {
@@ -149,6 +186,7 @@ impl AudioStats {
             late: self.late.load(Relaxed),
             max_gap_ms: self.max_gap_ns.load(Relaxed) as f64 / 1e6,
             interval_max_gap_ms: self.interval_max_gap_ns.swap(0, Relaxed) as f64 / 1e6,
+            realtime: self.realtime(),
         }
     }
 }
@@ -255,5 +293,18 @@ mod tests {
         let r = stats.take_report(SR);
         assert_eq!(r.late, 0);
         assert!(r.max_gap_ms < 4.0);
+    }
+
+    #[test]
+    fn realtime_status_encodes_every_outcome() {
+        let stats = AudioStats::default();
+        assert_eq!(stats.realtime(), Realtime::Pending);
+        stats.record_realtime(70, &Ok(()));
+        assert_eq!(stats.realtime(), Realtime::Active(70));
+        stats.record_realtime(70, &Err(std::io::Error::from_raw_os_error(1)));
+        assert_eq!(stats.realtime(), Realtime::Denied(1));
+        stats.record_realtime(0, &Ok(()));
+        assert_eq!(stats.realtime(), Realtime::Off);
+        assert_eq!(stats.take_report(SR).realtime, Realtime::Off);
     }
 }
