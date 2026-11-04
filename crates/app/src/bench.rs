@@ -1,7 +1,7 @@
 //! Banco de pruebas (Hito 1): N sinusoides simultáneas y métricas del callback.
 
 use crate::audio::{self, AudioArgs};
-use crate::stats::AudioStats;
+use crate::stats::{AudioStats, Realtime};
 use anyhow::Result;
 use clap::Args;
 use distrodaw_engine::{Event, ParamId, SineBank, Synth, VOICES};
@@ -22,6 +22,11 @@ pub struct BenchArgs {
     /// Forma de onda del sinte (0 seno, 1 sierra, 2 cuadrada, 3 triangular).
     #[arg(long, default_value_t = 1.0)]
     waveform: f32,
+
+    /// Hilos que consumen CPU a prioridad normal mientras suena (simula una
+    /// interfaz gráfica ocupada para comprobar si el audio aguanta).
+    #[arg(long, default_value_t = 0)]
+    stress: usize,
 
     /// Duración de la prueba en segundos.
     #[arg(long, default_value_t = 3)]
@@ -49,6 +54,14 @@ pub fn run(audio_args: &AudioArgs, args: &BenchArgs) -> Result<()> {
         }
     })?;
 
+    for _ in 0..args.stress {
+        std::thread::spawn(|| loop {
+            std::hint::black_box((0..10_000u32).fold(0u32, |a, b| a.wrapping_mul(31).wrapping_add(b)));
+        });
+    }
+    if args.stress > 0 {
+        println!("Con {} hilos de carga a prioridad normal", args.stress);
+    }
     if use_synth {
         println!("Sonando el sinte con {VOICES} notas durante {} s...", args.seconds);
     } else {
@@ -63,13 +76,16 @@ pub fn run(audio_args: &AudioArgs, args: &BenchArgs) -> Result<()> {
         // tamaño del último callback como referencia.
         let buffer = output.info.device_buffer.unwrap_or(r.frames_per_callback);
         println!(
-            "buffer {} frames ({:.2} ms) | callback {} frames | carga media {:.1} % | pico del intervalo {:.1} % | plazos perdidos {} | errores {}",
+            "buffer {} frames ({:.2} ms) | callback {} frames | carga media {:.1} % | pico del intervalo {:.1} % | hueco máx {:.2} ms | retrasos {} | plazos perdidos {} | xruns {} | errores {}",
             buffer,
             buffer_ms(buffer),
             r.frames_per_callback,
             r.avg_load * 100.0,
             r.interval_max_load * 100.0,
+            r.interval_max_gap_ms,
+            r.late,
             r.misses,
+            r.xruns,
             r.stream_errors,
         );
     }
@@ -77,7 +93,7 @@ pub fn run(audio_args: &AudioArgs, args: &BenchArgs) -> Result<()> {
     let r = stats.take_report(rate);
     let buffer = output.info.device_buffer.unwrap_or(r.frames_per_callback);
     println!(
-        "RESUMEN callbacks={} buffer_frames={} buffer_ms={:.2} callback_frames={} carga_media={:.1}% pico={:.1}% pico_ms={:.2} plazos_perdidos={} errores={}",
+        "RESUMEN callbacks={} buffer_frames={} buffer_ms={:.2} callback_frames={} carga_media={:.1}% pico={:.1}% pico_ms={:.2} hueco_max_ms={:.2} retrasos={} plazos_perdidos={} xruns={} errores={} tiempo_real={}",
         r.callbacks,
         buffer,
         buffer_ms(buffer),
@@ -85,10 +101,23 @@ pub fn run(audio_args: &AudioArgs, args: &BenchArgs) -> Result<()> {
         r.avg_load * 100.0,
         r.peak_load * 100.0,
         r.peak_ms,
+        r.max_gap_ms,
+        r.late,
         r.misses,
+        r.xruns,
         r.stream_errors,
+        realtime_text(r.realtime),
     );
     Ok(())
+}
+
+fn realtime_text(rt: Realtime) -> String {
+    match rt {
+        Realtime::Pending => "pendiente".into(),
+        Realtime::Off => "desactivado".into(),
+        Realtime::Active(p) => format!("fifo{p}"),
+        Realtime::Denied(errno) => format!("denegado(errno {errno})"),
+    }
 }
 
 fn chord_events(waveform: f32) -> [Event; VOICES + 2] {

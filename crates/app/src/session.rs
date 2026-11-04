@@ -7,6 +7,7 @@
 
 use crate::audio::{self, AudioArgs, AudioInfo, Output};
 use crate::midi::{self, Midi};
+use crate::rt;
 use crate::shared::Shared;
 use crate::stats::AudioStats;
 use anyhow::{anyhow, Result};
@@ -179,11 +180,18 @@ pub fn start(
 
     if let Some(port) = port {
         let name = input.port_name(&port).map_err(|e| anyhow!("{e}"))?;
+        let midi_priority = rt::midi_priority(audio_args.rt_priority);
+        let mut midi_rt_pending = midi_priority > 0;
         let connection = input
             .connect(
                 &port,
                 "distrodaw-in",
                 move |_timestamp, bytes, _| {
+                    if midi_rt_pending {
+                        // Una vez, desde el hilo MIDI. Si no hay permiso, sigue con prioridad normal.
+                        midi_rt_pending = false;
+                        let _ = rt::promote(midi_priority);
+                    }
                     let Some(msg) = midi::parse(bytes) else { return };
                     if monitor {
                         println!("{msg:?}");
@@ -223,6 +231,7 @@ impl Session {
         });
         match result {
             Ok(output) => {
+                self.stats.reset_gap();
                 self.info = output.info.clone();
                 self.output = Some(output);
                 Ok(())
@@ -351,7 +360,7 @@ mod tests {
             panic!("tiempo agotado esperando: {what}");
         }
 
-        let args = AudioArgs { device: None, buffer: None, rate: None };
+        let args = AudioArgs { device: None, buffer: None, rate: None, rt_priority: 0 };
         let mut s = start(&args, None, false, Mode::Tui).expect("abrir audio");
         assert!(!s.audio_lost());
         let rate = s.info.sample_rate;

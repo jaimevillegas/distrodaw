@@ -1,0 +1,12 @@
+name = "Dracula"
+
+[colors]
+background = "#282a36"
+foreground = "#f8f8f2"
+title      = "#bd93f9"   # títulos de pantalla
+label      = "#6272a4"   # etiquetas, bordes y textos secundarios
+value      = "#50fa7b"   # valores y barras
+accent     = "#f1fa8c"   # resaltes (cadena de señal)
+ok         = "#50fa7b"   # medidor y estado correcto
+warn       = "#ffb86c"   # medidor alto
+alert      = "#ff5555"   # errores y medidor al máximo

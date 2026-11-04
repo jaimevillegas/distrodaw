@@ -1,5 +1,6 @@
 //! Apertura de la salida de audio, común al banco de pruebas y al sinte.
 
+use crate::rt;
 use crate::stats::AudioStats;
 use anyhow::{anyhow, Context, Result};
 use clap::Args;
@@ -25,6 +26,11 @@ pub struct AudioArgs {
     /// Frecuencia de muestreo en Hz (por defecto, la del dispositivo).
     #[arg(long, global = true)]
     pub rate: Option<u32>,
+
+    /// Prioridad de tiempo real (SCHED_FIFO, 1 a 99) del hilo de audio; 0 la desactiva.
+    /// Sin permiso del sistema se ignora y se avisa (ver docs/AUDIO.md).
+    #[arg(long, global = true, default_value_t = rt::AUDIO_PRIORITY)]
+    pub rt_priority: i32,
 }
 
 /// Datos del dispositivo abierto, para mostrarlos.
@@ -117,11 +123,11 @@ where
 
     let render = make_render(config.sample_rate as f32);
     let stream = match sample_format {
-        SampleFormat::F32 => build::<f32, R>(&device, config, stats, verbose, render)?,
-        SampleFormat::I32 => build::<i32, R>(&device, config, stats, verbose, render)?,
-        SampleFormat::I24 => build::<cpal::I24, R>(&device, config, stats, verbose, render)?,
-        SampleFormat::I16 => build::<i16, R>(&device, config, stats, verbose, render)?,
-        SampleFormat::U16 => build::<u16, R>(&device, config, stats, verbose, render)?,
+        SampleFormat::F32 => build::<f32, R>(&device, config, stats, verbose, args.rt_priority, render)?,
+        SampleFormat::I32 => build::<i32, R>(&device, config, stats, verbose, args.rt_priority, render)?,
+        SampleFormat::I24 => build::<cpal::I24, R>(&device, config, stats, verbose, args.rt_priority, render)?,
+        SampleFormat::I16 => build::<i16, R>(&device, config, stats, verbose, args.rt_priority, render)?,
+        SampleFormat::U16 => build::<u16, R>(&device, config, stats, verbose, args.rt_priority, render)?,
         other => return Err(anyhow!("formato de muestra no soportado: {other:?}")),
     };
     stream.play()?;
@@ -139,6 +145,7 @@ fn build<T, R>(
     config: cpal::StreamConfig,
     stats: &Arc<AudioStats>,
     verbose: bool,
+    rt_priority: i32,
     mut render: R,
 ) -> Result<cpal::Stream>
 where
@@ -150,11 +157,19 @@ where
     let mut mono = vec![0.0f32; CHUNK];
     let cb_stats = Arc::clone(stats);
     let err_stats = Arc::clone(stats);
+    let mut realtime_pending = true;
 
     let stream = device.build_output_stream(
         config,
         move |data: &mut [T], _: &cpal::OutputCallbackInfo| {
             // Hilo de audio: sin reservas de memoria ni locks.
+            if realtime_pending {
+                // Una sola vez, en el primer callback: es el único momento en que
+                // sabemos qué hilo ejecuta el audio.
+                realtime_pending = false;
+                let outcome = if rt_priority > 0 { rt::promote(rt_priority) } else { Ok(()) };
+                cb_stats.record_realtime(rt_priority, &outcome);
+            }
             let start = Instant::now();
             let frames = data.len() / channels;
             let mut done = 0;
@@ -170,7 +185,7 @@ where
                 }
                 done += n;
             }
-            cb_stats.record(frames, start.elapsed(), rate);
+            cb_stats.record(frames, start, start.elapsed(), rate);
         },
         move |err: cpal::Error| {
             match err.kind() {

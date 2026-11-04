@@ -10,6 +10,7 @@ distrodaw-engine = { path = "../engine" }
 distrodaw-tui = { path = "../tui" }
 cpal = "0.18"
 anyhow = "1"
+libc = "0.2"
 clap = { version = "4", features = ["derive"] }
 midir = "0.11"
 rtrb = "0.3"

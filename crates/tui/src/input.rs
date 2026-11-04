@@ -9,6 +9,7 @@
 //! | RePág / AvPág | Ajuste grueso (10 %) |
 //! | F5 | Pantalla Files |
 //! | Enter, `s`, `n` | En Files: cargar, guardar sobre el seleccionado, guardar nuevo |
+//! | Ctrl+L | Repintar la pantalla |
 //! | q, Ctrl+C | Salir |
 //!
 //! El ajuste fino también está en `,` y `.` porque la consola del kernel no
@@ -26,6 +27,7 @@ pub fn action_for_key(key: KeyEvent) -> Option<Action> {
     let horizontal = if shift { Step::Fine } else { Step::Normal };
     match key.code {
         KeyCode::Char('c') if ctrl => Some(Action::Quit),
+        KeyCode::Char('l') if ctrl => Some(Action::Redraw),
         KeyCode::Char('q') => Some(Action::Quit),
         KeyCode::F(1) => Some(Action::Screen(Screen::Play)),
         KeyCode::F(2) => Some(Action::Screen(Screen::Synth)),
@@ -86,6 +88,13 @@ mod tests {
         assert_eq!(press(KeyCode::Enter), Some(Action::Confirm));
         assert_eq!(press(KeyCode::Char('s')), Some(Action::Save));
         assert_eq!(press(KeyCode::Char('n')), Some(Action::SaveNew));
+    }
+
+    #[test]
+    fn ctrl_l_redraws_but_plain_l_still_adjusts() {
+        let ctrl_l = action_for_key(KeyEvent::new(KeyCode::Char('l'), KeyModifiers::CONTROL));
+        assert_eq!(ctrl_l, Some(Action::Redraw));
+        assert_eq!(press(KeyCode::Char('l')), Some(Action::Adjust { direction: 1, step: Step::Normal }));
     }
 
     #[test]

@@ -60,6 +60,8 @@ pub enum Action {
     Save,
     /// Guarda como un patch nuevo (en Files).
     SaveNew,
+    /// Vuelve a pintar toda la pantalla (tras cambiar de tamaño, o con Ctrl+L).
+    Redraw,
     Quit,
 }
 
@@ -91,6 +93,19 @@ pub struct Edit {
     pub value: f32,
 }
 
+/// Si el hilo de audio tiene prioridad de tiempo real.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum Realtime {
+    #[default]
+    Pending,
+    /// Desactivado a propósito.
+    Off,
+    /// Activo con esta prioridad.
+    Active(i32),
+    /// El sistema no lo permite (falta el permiso).
+    Denied,
+}
+
 #[derive(Debug, Clone)]
 pub struct UiState {
     pub screen: Screen,
@@ -106,6 +121,11 @@ pub struct UiState {
     pub cpu_load: f32,
     pub misses: u64,
     pub errors: u64,
+    /// Callbacks de audio que llegaron tarde (el hilo tardó en ejecutarse).
+    pub late: u64,
+    /// Mayor hueco entre dos callbacks seguidos, en milisegundos.
+    pub max_gap_ms: f32,
+    pub realtime: Realtime,
     pub midi_port: String,
     pub audio_info: String,
     /// El dispositivo de audio se perdió y se está reintentando abrirlo.
@@ -137,6 +157,9 @@ impl Default for UiState {
             cpu_load: 0.0,
             misses: 0,
             errors: 0,
+            late: 0,
+            max_gap_ms: 0.0,
+            realtime: Realtime::Pending,
             midi_port: String::new(),
             audio_info: String::new(),
             audio_lost: false,
@@ -193,7 +216,8 @@ impl UiState {
             | Action::Adjust { .. }
             | Action::Confirm
             | Action::Save
-            | Action::SaveNew => {}
+            | Action::SaveNew
+            | Action::Redraw => {}
         }
         None
     }
@@ -235,6 +259,65 @@ impl UiState {
             u16::MAX => {}
             n => self.status_frames = n - 1,
         }
+    }
+
+    /// `true` si dibujar `self` daría exactamente la misma pantalla que `other`.
+    /// Sirve para no redibujar cuando no ha cambiado nada visible: el medidor y
+    /// los porcentajes se comparan tal como se muestran, no con todos sus decimales.
+    ///
+    /// Se desestructuran todos los campos a propósito: si se añade uno nuevo,
+    /// el compilador obliga a decidir aquí si afecta a lo que se ve.
+    pub fn visually_same(&self, other: &UiState) -> bool {
+        let UiState {
+            screen,
+            selected,
+            params,
+            peak,
+            voices,
+            recent_notes,
+            cpu_load,
+            misses,
+            errors,
+            late,
+            max_gap_ms,
+            realtime,
+            midi_port,
+            audio_info,
+            audio_lost,
+            patch,
+            patch_dir,
+            files,
+            file_cursor,
+            loaded_file,
+            status,
+            status_frames: _, // solo cuenta el tiempo; lo visible es `status`
+            request: _,       // una petición pendiente no se dibuja
+            quit: _,
+        } = self;
+        let meter = |p: f32| (p.clamp(0.0, 1.0) * 16.0).round() as u32;
+        let percent = |c: f32| (c * 100.0).round() as i64;
+        let tenths = |ms: f32| (ms * 10.0).round() as i64;
+        *screen == other.screen
+            && *selected == other.selected
+            && params.iter().zip(&other.params).all(|(a, b)| a.to_bits() == b.to_bits())
+            && meter(*peak) == meter(other.peak)
+            && *voices == other.voices
+            && *recent_notes == other.recent_notes
+            && percent(*cpu_load) == percent(other.cpu_load)
+            && *misses == other.misses
+            && *errors == other.errors
+            && *late == other.late
+            && tenths(*max_gap_ms) == tenths(other.max_gap_ms)
+            && *realtime == other.realtime
+            && *midi_port == other.midi_port
+            && *audio_info == other.audio_info
+            && *audio_lost == other.audio_lost
+            && *patch == other.patch
+            && *patch_dir == other.patch_dir
+            && *files == other.files
+            && *file_cursor == other.file_cursor
+            && *loaded_file == other.loaded_file
+            && *status == other.status
     }
 
     pub fn note_on(&mut self, note: u8) {
@@ -446,5 +529,69 @@ mod tests {
         assert_eq!(s.status, Some(Status { text: "fallo".into(), error: true }));
         s.set_status("ok", false);
         assert_eq!(s.status.as_ref().unwrap().text, "ok");
+    }
+
+    #[test]
+    fn identical_states_look_the_same() {
+        let a = UiState::default();
+        assert!(a.visually_same(&a.clone()));
+    }
+
+    #[test]
+    fn invisible_differences_do_not_force_a_redraw() {
+        let a = UiState::default();
+        let mut b = a.clone();
+        b.peak = 0.01; // menos de media casilla del medidor
+        b.cpu_load = 0.004; // se muestra como 0 %
+        b.max_gap_ms = 0.04; // se muestra como 0,0 ms
+        assert!(a.visually_same(&b));
+        b.request = Some(FileRequest::SaveNew);
+        b.quit = true;
+        assert!(a.visually_same(&b));
+    }
+
+    #[test]
+    fn every_visible_change_forces_a_redraw() {
+        let base = UiState::default();
+        let changes: Vec<(&str, Box<dyn Fn(&mut UiState)>)> = vec![
+            ("pantalla", Box::new(|s| s.screen = Screen::Synth)),
+            ("selección", Box::new(|s| s.selected = 2)),
+            ("parámetro", Box::new(|s| s.params[1] += 0.001)),
+            ("medidor", Box::new(|s| s.peak = 0.5)),
+            ("voces", Box::new(|s| s.voices = 3)),
+            ("notas", Box::new(|s| s.note_on(60))),
+            ("cpu", Box::new(|s| s.cpu_load = 0.5)),
+            ("xruns", Box::new(|s| s.misses = 1)),
+            ("errores", Box::new(|s| s.errors = 1)),
+            ("tarde", Box::new(|s| s.late = 1)),
+            ("hueco", Box::new(|s| s.max_gap_ms = 5.0)),
+            ("tiempo real", Box::new(|s| s.realtime = Realtime::Denied)),
+            ("midi", Box::new(|s| s.midi_port = "X".into())),
+            ("audio", Box::new(|s| s.audio_info = "X".into())),
+            ("audio perdido", Box::new(|s| s.audio_lost = true)),
+            ("patch", Box::new(|s| s.patch = "X".into())),
+            ("carpeta", Box::new(|s| s.patch_dir = "X".into())),
+            ("archivos", Box::new(|s| s.files = vec!["a.toml".into()])),
+            ("cursor", Box::new(|s| s.file_cursor = 1)),
+            ("cargado", Box::new(|s| s.loaded_file = Some("a.toml".into()))),
+            ("mensaje", Box::new(|s| s.set_status("hola", false))),
+        ];
+        for (what, change) in changes {
+            let mut changed = base.clone();
+            change(&mut changed);
+            assert!(!base.visually_same(&changed), "{what} debería provocar un redibujado");
+        }
+    }
+
+    #[test]
+    fn a_status_message_expiring_is_a_visible_change() {
+        let mut a = UiState::default();
+        a.set_status("hecho", false);
+        let mut b = a.clone();
+        for _ in 0..200 {
+            b.tick();
+        }
+        assert!(b.status.is_none());
+        assert!(!a.visually_same(&b));
     }
 }
