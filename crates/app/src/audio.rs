@@ -30,6 +30,7 @@ pub struct AudioArgs {
 /// Stream de salida abierto. Mantenerlo vivo mantiene el audio sonando.
 pub struct Output {
     _stream: cpal::Stream,
+    pub device_name: String,
     pub sample_rate: u32,
     /// Buffer pedido con `--buffer`; `None` si se usa el del dispositivo.
     pub device_buffer: Option<u64>,
@@ -72,7 +73,8 @@ where
 {
     let host = cpal::default_host();
     let device = pick_device(&host, args.device.as_deref())?;
-    println!("Dispositivo: {}", device.name().unwrap_or_else(|_| "?".into()));
+    let device_name = device.name().unwrap_or_else(|_| "?".into());
+    println!("Dispositivo: {device_name}");
 
     let supported = device.default_output_config().context("config de salida")?;
     let sample_format = supported.sample_format();
@@ -98,7 +100,7 @@ where
         BufferSize::Fixed(frames) => Some(u64::from(frames)),
         BufferSize::Default => None,
     };
-    Ok(Output { _stream: stream, sample_rate: config.sample_rate.0, device_buffer })
+    Ok(Output { _stream: stream, device_name, sample_rate: config.sample_rate.0, device_buffer })
 }
 
 fn build<T, R>(
