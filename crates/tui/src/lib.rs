@@ -5,6 +5,7 @@
 //! produce las mismas [`Action`]).
 
 pub mod format;
+pub mod input;
 pub mod state;
 
 pub use state::{Action, Edit, Screen, Step, UiState};

@@ -7,3 +7,4 @@ license.workspace = true
 
 [dependencies]
 distrodaw-engine = { path = "../engine" }
+ratatui = "0.29"
