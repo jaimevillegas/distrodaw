@@ -12,8 +12,8 @@ Pi 2 con el Volt 2 (buffers de 64 a 256 frames, hasta 64 sinusoides sin cortes).
 Ver [docs/HITO1.md](docs/HITO1.md).
 
 Hito 2 implementado: sinte polifónico de 8 voces con ADSR y parámetros con ID,
-controlado por teclado MIDI (`distrodaw play`). Probado con un puerto MIDI virtual;
-pendiente de probar con el teclado real. Ver [docs/HITO2.md](docs/HITO2.md).
+controlado por teclado MIDI (`distrodaw play`). Probado con un puerto MIDI virtual y
+con un teclado USB real en la Pi 2; pendiente medir la latencia real. Ver [docs/HITO2.md](docs/HITO2.md).
 
 ## Estructura
 

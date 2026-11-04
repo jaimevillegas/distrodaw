@@ -87,5 +87,9 @@ entrada) y un pulso MIDI, y queda pendiente.
       robo de voces, marcas de tiempo, interpretación MIDI y mapa de CC.
 - [x] `play` extremo a extremo en el PC y en la Pi 2 enviando notas y CC por el
       puerto virtual «Midi Through» (`aseqsend`): llegan al motor y suenan las voces.
-- [ ] Probar con el teclado MIDI USB real conectado a la Pi.
+- [x] Teclado MIDI USB real (M-Audio Keystation 49e) en la Pi 2, 25 s tocando con
+      `--buffer 128`: 568 mensajes (notas y CC 7 del control de volumen) llegaron al
+      motor, las voces subieron hasta 8/8 y volvieron a 0 al soltar, con carga media
+      del 1,6 %, pico de 0,06 ms, 0 plazos perdidos y 0 errores. El CC 1 (rueda de
+      modulación) no está asignado a ningún parámetro.
 - [ ] Medir la latencia real (loopback).
