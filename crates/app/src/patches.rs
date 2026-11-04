@@ -1,6 +1,7 @@
 //! Archivos de patches: listar, leer, guardar y vigilar cambios.
 
-use distrodaw_engine::Patch;
+use distrodaw_engine::{Event, ParamId, Patch};
+use rtrb::Producer;
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
@@ -42,6 +43,23 @@ pub fn new_file_path(dir: &Path) -> PathBuf {
         .map(|n| dir.join(format!("patch-{n:03}.{EXTENSION}")))
         .find(|p| !p.exists())
         .expect("siempre hay un número libre")
+}
+
+/// Nombres de archivo de los patches de `dir`; vacío si la carpeta no existe.
+pub fn file_names(dir: &Path) -> Vec<String> {
+    list(dir)
+        .unwrap_or_default()
+        .iter()
+        .filter_map(|p| p.file_name().map(|n| n.to_string_lossy().into_owned()))
+        .collect()
+}
+
+/// Envía todos los parámetros del patch al motor. Si la cola está llena se
+/// pierde lo que no quepa; volver a cargar el patch lo completa.
+pub fn send(patch: &Patch, queue: &mut Producer<Event>) {
+    for id in ParamId::ALL {
+        let _ = queue.push(Event::set_param(0, id, patch.params.get(id)));
+    }
 }
 
 /// Huella de un archivo: cambia si se modifica su contenido o su tamaño.

@@ -1,22 +1,43 @@
-//! Interfaz de terminal: pantallas Play y Synth sobre una sesión de tocar.
+//! Interfaz de terminal: pantallas Play, Synth y Files sobre una sesión de tocar.
 
 use crate::audio::AudioArgs;
 use crate::midi::Midi;
-use crate::session::{self, Mode};
+use crate::patches::{self, Watcher};
+use crate::session::{self, Mode, Session};
 use anyhow::Result;
 use clap::Args;
-use distrodaw_engine::Event;
-use distrodaw_tui::{next_action, Tui, UiState};
-use std::time::Duration;
+use distrodaw_engine::Patch;
+use distrodaw_tui::{next_action, FileRequest, Tui, UiState};
+use std::fs;
+use std::path::{Path, PathBuf};
+use std::time::{Duration, Instant};
 
 /// Cuadro de la interfaz: unos 30 por segundo.
 const FRAME: Duration = Duration::from_millis(33);
+/// Cada cuánto se vuelve a leer la lista de patches de la carpeta.
+const REFRESH_FILES: Duration = Duration::from_secs(1);
+/// Nombre del patch sin nombre propio; al guardarlo se usa el del archivo.
+const UNNAMED: &str = "Init";
 
-#[derive(Args, Debug, Default)]
+#[derive(Args, Debug)]
 pub struct TuiArgs {
     /// Fragmento del nombre del puerto MIDI (por defecto, el primer teclado).
     #[arg(long)]
     pub midi: Option<String>,
+
+    /// Patch (.toml) que se carga al arrancar y se recarga solo al guardarlo.
+    #[arg(long)]
+    pub patch: Option<PathBuf>,
+
+    /// Carpeta de patches para la pantalla Files.
+    #[arg(long, default_value = "patches")]
+    pub patch_dir: PathBuf,
+}
+
+impl Default for TuiArgs {
+    fn default() -> Self {
+        Self { midi: None, patch: None, patch_dir: PathBuf::from("patches") }
+    }
 }
 
 pub fn run(audio_args: &AudioArgs, args: &TuiArgs) -> Result<()> {
@@ -28,8 +49,21 @@ pub fn run(audio_args: &AudioArgs, args: &TuiArgs) -> Result<()> {
     state.midi_port = session.midi_port.clone().unwrap_or_else(|| "(sin teclado MIDI)".into());
     let buffer = session.output.device_buffer.map_or("auto".to_string(), |b| b.to_string());
     state.audio_info = format!("{} · {rate} Hz · buffer {buffer}", session.output.device_name);
+    state.patch_dir = args.patch_dir.display().to_string();
+    state.set_files(patches::file_names(&args.patch_dir));
+
+    // Un patch que no carga no impide arrancar: se avisa y se sigue vigilando el
+    // archivo, de modo que al corregirlo se recarga solo.
+    let mut watcher = args.patch.clone().map(Watcher::new);
+    if let Some(path) = &args.patch {
+        match patches::load(path) {
+            Ok(patch) => show_loaded(&mut state, &mut session, path, &patch, "Cargado"),
+            Err(e) => state.set_status(e, true),
+        }
+    }
 
     let mut tui = Tui::enter()?;
+    let mut last_refresh = Instant::now();
     while !state.quit {
         while let Ok(msg) = session.midi_rx.pop() {
             if let Midi::NoteOn { note, .. } = msg {
@@ -43,15 +77,96 @@ pub fn run(audio_args: &AudioArgs, args: &TuiArgs) -> Result<()> {
         state.cpu_load = report.interval_avg_load as f32;
         state.misses = report.misses;
         state.errors = report.stream_errors;
+        state.tick();
+
+        if last_refresh.elapsed() >= REFRESH_FILES {
+            last_refresh = Instant::now();
+            state.set_files(patches::file_names(&args.patch_dir));
+        }
+
+        if let Some(result) = watcher.as_mut().and_then(Watcher::poll) {
+            let path = watcher.as_ref().map(|w| w.path().to_path_buf()).unwrap_or_default();
+            match result {
+                Ok(patch) => show_loaded(&mut state, &mut session, &path, &patch, "Recargado"),
+                Err(e) => state.set_status(format!("Recarga fallida, se mantiene el sonido · {e}"), true),
+            }
+        }
+
+        if let Some(request) = state.request.take() {
+            handle_file_request(request, &args.patch_dir, &mut state, &mut session, &mut watcher);
+        }
 
         tui.draw(&state)?;
 
         if let Some(action) = next_action(FRAME)? {
             if let Some(edit) = state.apply(action) {
                 // Si la cola está llena se pierde este paso; el siguiente lo recupera.
-                let _ = session.ui_tx.push(Event::set_param(0, edit.id, edit.value));
+                let _ = session.ui_tx.push(distrodaw_engine::Event::set_param(0, edit.id, edit.value));
             }
         }
     }
     Ok(())
+}
+
+fn file_name(path: &Path) -> String {
+    path.file_name().map_or_else(|| path.display().to_string(), |n| n.to_string_lossy().into_owned())
+}
+
+/// Aplica un patch al motor y lo refleja en la interfaz.
+fn show_loaded(state: &mut UiState, session: &mut Session, path: &Path, patch: &Patch, verb: &str) {
+    patches::send(patch, &mut session.ui_tx);
+    state.patch = patch.name.clone();
+    state.loaded_file = Some(file_name(path));
+    state.set_status(format!("{verb} {}", file_name(path)), false);
+}
+
+fn handle_file_request(
+    request: FileRequest,
+    dir: &Path,
+    state: &mut UiState,
+    session: &mut Session,
+    watcher: &mut Option<Watcher>,
+) {
+    let path = match request {
+        FileRequest::Load(i) | FileRequest::Save(i) => match state.files.get(i) {
+            Some(name) => dir.join(name),
+            None => return,
+        },
+        FileRequest::SaveNew => patches::new_file_path(dir),
+    };
+
+    match request {
+        FileRequest::Load(_) => match patches::load(&path) {
+            Ok(patch) => {
+                show_loaded(state, session, &path, &patch, "Cargado");
+                *watcher = Some(Watcher::new(path));
+            }
+            Err(e) => state.set_status(e, true),
+        },
+        FileRequest::Save(_) | FileRequest::SaveNew => {
+            let name = if state.patch == UNNAMED {
+                path.file_stem().map_or_else(|| UNNAMED.to_string(), |s| s.to_string_lossy().into_owned())
+            } else {
+                state.patch.clone()
+            };
+            let mut patch = Patch { name, ..Patch::default() };
+            for (id, value) in distrodaw_engine::ParamId::ALL.into_iter().zip(state.params) {
+                patch.params.set(id, value);
+            }
+            let saved = fs::create_dir_all(dir).and_then(|()| patches::save(&path, &patch));
+            match saved {
+                Ok(()) => {
+                    state.patch = patch.name;
+                    state.loaded_file = Some(file_name(&path));
+                    state.set_status(format!("Guardado {}", file_name(&path)), false);
+                    state.set_files(patches::file_names(dir));
+                    // El archivo recién escrito ya es lo que suena: no hace falta recargarlo.
+                    let mut new_watcher = Watcher::new(path);
+                    new_watcher.mark_current();
+                    *watcher = Some(new_watcher);
+                }
+                Err(e) => state.set_status(format!("No se pudo guardar {}: {e}", file_name(&path)), true),
+            }
+        }
+    }
 }
