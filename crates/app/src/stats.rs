@@ -69,10 +69,3 @@ impl AudioStats {
         }
     }
 }
-
-impl Report {
-    /// Latencia teórica de salida de un buffer, en milisegundos.
-    pub fn buffer_ms(&self, sample_rate: u32) -> f64 {
-        self.frames_per_callback as f64 * 1000.0 / sample_rate as f64
-    }
-}

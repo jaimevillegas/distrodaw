@@ -75,13 +75,22 @@ fn main() -> Result<()> {
     stream.play()?;
     println!("Sonando {} voz/voces durante {} s...", args.voices, args.seconds);
     let rate = config.sample_rate.0;
+    // Con buffer fijo, la latencia de salida es el buffer pedido. Sin él se
+    // desconoce y se muestra el tamaño del último callback como referencia.
+    let device_buffer = match config.buffer_size {
+        BufferSize::Fixed(frames) => Some(u64::from(frames)),
+        BufferSize::Default => None,
+    };
+    let buffer_ms = |frames: u64| frames as f64 * 1000.0 / f64::from(rate);
     for _ in 0..args.seconds {
         std::thread::sleep(Duration::from_secs(1));
         let r = stats.take_report(rate);
+        let buffer = device_buffer.unwrap_or(r.frames_per_callback);
         println!(
-            "buffer {} frames ({:.2} ms) | carga media {:.1} % | pico del intervalo {:.1} % | plazos perdidos {} | errores {}",
+            "buffer {} frames ({:.2} ms) | callback {} frames | carga media {:.1} % | pico del intervalo {:.1} % | plazos perdidos {} | errores {}",
+            buffer,
+            buffer_ms(buffer),
             r.frames_per_callback,
-            r.buffer_ms(rate),
             r.avg_load * 100.0,
             r.interval_max_load * 100.0,
             r.misses,
@@ -90,11 +99,13 @@ fn main() -> Result<()> {
     }
 
     let r = stats.take_report(rate);
+    let buffer = device_buffer.unwrap_or(r.frames_per_callback);
     println!(
-        "RESUMEN callbacks={} buffer_frames={} buffer_ms={:.2} carga_media={:.1}% pico={:.1}% plazos_perdidos={} errores={}",
+        "RESUMEN callbacks={} buffer_frames={} buffer_ms={:.2} callback_frames={} carga_media={:.1}% pico={:.1}% plazos_perdidos={} errores={}",
         r.callbacks,
+        buffer,
+        buffer_ms(buffer),
         r.frames_per_callback,
-        r.buffer_ms(rate),
         r.avg_load * 100.0,
         r.peak_load * 100.0,
         r.misses,
