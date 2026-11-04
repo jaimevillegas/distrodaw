@@ -24,5 +24,14 @@ cd "$(dirname "$0")"
       sleep 1  # deja que ALSA libere el dispositivo antes de la siguiente prueba
     done
   done
+  # Sinte real: 8 notas sostenidas con seno (la forma más cara) y con sierra.
+  for buffer in 64 128 256; do
+    for waveform in 0 1; do
+      echo "## sinte buffer=$buffer forma=$waveform"
+      ./distrodaw bench "${args[@]}" --rate "$rate" --buffer "$buffer" --synth --waveform "$waveform" --seconds "$seconds" \
+        2>&1 | grep -E '^RESUMEN|^Error' || echo "FALLO al abrir el stream"
+      sleep 1
+    done
+  done
 } | tee "$out"
 echo "Resultados guardados en $out"
