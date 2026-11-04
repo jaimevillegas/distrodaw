@@ -1,0 +1,8 @@
+[package]
+name = "distrodaw-engine"
+description = "Motor de audio de DistroDAW: osciladores, voces y secuenciador. Sin I/O, portable."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
