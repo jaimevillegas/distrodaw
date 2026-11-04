@@ -1,4 +1,9 @@
 //! Interfaz de terminal de DistroDAW.
 //!
-//! Pantallas previstas: Play (F1), Synth (F2), Seq (F3), Song (F4), Files (F5).
-//! Se implementará con `ratatui` + `crossterm` en el Hito 3.
+//! Pantallas: Play (F1) y Synth (F2); Seq, Song y Files llegan en hitos
+//! posteriores. Se dibuja con `ratatui` y se maneja con teclado (y joystick, que
+//! produce las mismas [`Action`]).
+
+pub mod state;
+
+pub use state::{Action, Edit, Screen, Step, UiState};
