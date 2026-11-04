@@ -15,6 +15,15 @@ use std::sync::Arc;
 const BATCH: usize = 32;
 const QUEUE: usize = 256;
 
+/// Cómo se muestra la sesión; decide si se puede escribir en la consola.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Mode {
+    /// Línea de estado en texto; con `monitor` imprime cada mensaje MIDI.
+    Text { monitor: bool },
+    /// Interfaz a pantalla completa: no se debe escribir nada por la consola.
+    Tui,
+}
+
 pub struct Session {
     pub output: Output,
     pub stats: Arc<AudioStats>,
@@ -34,8 +43,9 @@ pub fn start(
     audio_args: &AudioArgs,
     midi_filter: Option<&str>,
     midi_required: bool,
-    monitor: bool,
+    mode: Mode,
 ) -> Result<Session> {
+    let monitor = mode == Mode::Text { monitor: true };
     let input = MidiInput::new("distrodaw")?;
     let port = match midi::pick_port(&input, midi_filter) {
         Ok(port) => Some(port),
@@ -50,7 +60,7 @@ pub fn start(
     let shared = Arc::new(Shared::default());
 
     let audio_shared = Arc::clone(&shared);
-    let output = audio::open(audio_args, &stats, move |rate| {
+    let output = audio::open(audio_args, &stats, mode != Mode::Tui, move |rate| {
         let mut synth = Synth::new(rate);
         let mut events = [Event::note_off(0, 0); BATCH * 2];
         move |out: &mut [f32]| {

@@ -1,7 +1,7 @@
 //! Modo de texto: tocar con el teclado MIDI y ver una línea de estado.
 
 use crate::audio::AudioArgs;
-use crate::session;
+use crate::session::{self, Mode};
 use anyhow::Result;
 use clap::Args;
 use std::io::Write;
@@ -23,7 +23,7 @@ pub struct PlayArgs {
 }
 
 pub fn run(audio_args: &AudioArgs, args: &PlayArgs) -> Result<()> {
-    let mut session = session::start(audio_args, args.midi.as_deref(), true, args.monitor)?;
+    let mut session = session::start(audio_args, args.midi.as_deref(), true, Mode::Text { monitor: args.monitor })?;
     println!("MIDI: {}", session.midi_port.as_deref().unwrap_or("-"));
     println!("Toca el teclado. Ctrl+C para salir.");
 

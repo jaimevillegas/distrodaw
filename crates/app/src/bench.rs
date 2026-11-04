@@ -32,7 +32,7 @@ pub fn run(audio_args: &AudioArgs, args: &BenchArgs) -> Result<()> {
     let stats = Arc::new(AudioStats::default());
     let voices = args.voices;
     let (use_synth, waveform) = (args.synth, args.waveform);
-    let output = audio::open(audio_args, &stats, move |rate| {
+    let output = audio::open(audio_args, &stats, true, move |rate| {
         let mut bank = SineBank::new(rate, if use_synth { 0 } else { voices }, 440.0);
         let mut synth = Synth::new(rate);
         // Acorde de 8 notas sostenidas, enviado en el primer callback.
