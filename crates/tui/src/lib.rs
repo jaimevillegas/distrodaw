@@ -4,6 +4,7 @@
 //! posteriores. Se dibuja con `ratatui` y se maneja con teclado (y joystick, que
 //! produce las mismas [`Action`]).
 
+pub mod format;
 pub mod state;
 
 pub use state::{Action, Edit, Screen, Step, UiState};
