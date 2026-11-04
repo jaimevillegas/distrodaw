@@ -1,0 +1,8 @@
+[package]
+name = "distrodaw-tui"
+description = "Interfaz de terminal de DistroDAW (pendiente: ratatui + crossterm)."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
