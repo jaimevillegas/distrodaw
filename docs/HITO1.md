@@ -42,7 +42,7 @@ En la Pi:
 
 ```sh
 cd ~/distrodaw
-./distrodaw --list-devices          # busca el nombre del Volt 2
+./distrodaw devices          # busca el nombre del Volt 2
 ./bench-pi.sh hw:CARD=V2,DEV=0      # prueba buffers 64/128/256 con 1 a 64 voces
 ```
 
@@ -53,7 +53,7 @@ guarda todo en `bench-<fecha>.txt`.
 También se puede lanzar una prueba suelta:
 
 ```sh
-./distrodaw --device hw:CARD=V2,DEV=0 --rate 48000 --buffer 64 --voices 16 --seconds 10
+./distrodaw bench --device hw:CARD=V2,DEV=0 --rate 48000 --buffer 64 --voices 16 --seconds 10
 ```
 
 ### Qué significan las métricas

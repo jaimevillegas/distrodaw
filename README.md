@@ -26,8 +26,8 @@ Requisitos: Rust estable y, en Linux, `libasound2-dev` (Debian/Ubuntu) o
 
 ```sh
 cargo test -p distrodaw-engine
-cargo run --release -p distrodaw -- --list-devices
-cargo run --release -p distrodaw -- --buffer 128 --rate 48000 --voices 16 --seconds 5
+cargo run --release -p distrodaw -- devices
+cargo run --release -p distrodaw -- bench --buffer 128 --rate 48000 --voices 16 --seconds 5
 ```
 
 ## Compilar para Raspberry Pi 2 (ARMv7)
