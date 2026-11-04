@@ -1,0 +1,12 @@
+name = "Solarized Dark"
+
+[colors]
+background = "#002b36"
+foreground = "#839496"
+title      = "#268bd2"
+label      = "#586e75"
+value      = "#859900"
+accent     = "#b58900"
+ok         = "#859900"
+warn       = "#cb4b16"
+alert      = "#dc322f"

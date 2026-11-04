@@ -1,0 +1,12 @@
+name = "Nord"
+
+[colors]
+background = "#2e3440"
+foreground = "#d8dee9"
+title      = "#88c0d0"
+label      = "#616e88"
+value      = "#a3be8c"
+accent     = "#ebcb8b"
+ok         = "#a3be8c"
+warn       = "#d08770"
+alert      = "#bf616a"
