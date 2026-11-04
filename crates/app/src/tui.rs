@@ -3,11 +3,12 @@
 use crate::audio::AudioArgs;
 use crate::midi::Midi;
 use crate::patches::{self, Watcher};
+use crate::themes;
 use crate::session::{self, AudioEvent, Mode, Session};
 use anyhow::Result;
-use clap::Args;
+use clap::{Args, ValueEnum};
 use distrodaw_engine::Patch;
-use distrodaw_tui::{next_action, FileRequest, Palette, Tui, UiState};
+use distrodaw_tui::{next_action, ColorMode, FileRequest, Palette, Tui, UiState};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
@@ -18,6 +19,17 @@ const FRAME: Duration = Duration::from_millis(33);
 const REFRESH_FILES: Duration = Duration::from_secs(1);
 /// Nombre del patch sin nombre propio; al guardarlo se usa el del archivo.
 const UNNAMED: &str = "Init";
+
+/// Cuántos colores usar.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
+pub enum ColorChoice {
+    /// 24 bits si `COLORTERM` lo indica, si no 16 colores.
+    Auto,
+    /// Solo los 16 colores básicos (consola del kernel).
+    Basic,
+    /// Fuerza 24 bits aunque el terminal no lo anuncie.
+    Truecolor,
+}
 
 #[derive(Args, Debug)]
 pub struct TuiArgs {
@@ -32,11 +44,30 @@ pub struct TuiArgs {
     /// Carpeta de patches para la pantalla Files.
     #[arg(long, default_value = "patches")]
     pub patch_dir: PathBuf,
+
+    /// Tema de color (nombre en `--theme-dir` o ruta a un .toml). Necesita 24 bits.
+    #[arg(long)]
+    pub theme: Option<String>,
+
+    /// Carpeta de temas.
+    #[arg(long, default_value = "themes")]
+    pub theme_dir: PathBuf,
+
+    /// Cuántos colores usar.
+    #[arg(long, value_enum, default_value_t = ColorChoice::Auto)]
+    pub color: ColorChoice,
 }
 
 impl Default for TuiArgs {
     fn default() -> Self {
-        Self { midi: None, patch: None, patch_dir: PathBuf::from("patches") }
+        Self {
+            midi: None,
+            patch: None,
+            patch_dir: PathBuf::from("patches"),
+            theme: None,
+            theme_dir: PathBuf::from("themes"),
+            color: ColorChoice::Auto,
+        }
     }
 }
 
@@ -60,7 +91,12 @@ pub fn run(audio_args: &AudioArgs, args: &TuiArgs) -> Result<()> {
         }
     }
 
-    let mut tui = Tui::enter(Palette::basic())?;
+    let (palette, note) = choose_palette(args, std::env::var("COLORTERM").ok().as_deref());
+    if let Some((text, error)) = note {
+        state.set_status(text, error);
+    }
+
+    let mut tui = Tui::enter(palette)?;
     let mut last_refresh = Instant::now();
     while !state.quit {
         while let Ok(msg) = session.midi_rx.pop() {
@@ -117,6 +153,25 @@ pub fn run(audio_args: &AudioArgs, args: &TuiArgs) -> Result<()> {
         }
     }
     Ok(())
+}
+
+/// Elige la paleta según los colores del terminal y el tema pedido. Devuelve
+/// además un aviso para mostrar si no se pudo aplicar lo pedido.
+fn choose_palette(args: &TuiArgs, colorterm: Option<&str>) -> (Palette, Option<(String, bool)>) {
+    let mode = match args.color {
+        ColorChoice::Auto => ColorMode::detect(colorterm),
+        ColorChoice::Basic => ColorMode::Basic,
+        ColorChoice::Truecolor => ColorMode::TrueColor,
+    };
+    let Some(name) = &args.theme else { return (Palette::basic(), None) };
+    if mode == ColorMode::Basic {
+        let note = format!("Tema {name}: el terminal no anuncia 24 bits, se usan 16 colores (--color truecolor lo fuerza)");
+        return (Palette::basic(), Some((note, false)));
+    }
+    match themes::load(name, &args.theme_dir) {
+        Ok(theme) => (Palette::from_theme(&theme), None),
+        Err(e) => (Palette::basic(), Some((e, true))),
+    }
 }
 
 fn file_name(path: &Path) -> String {
@@ -179,5 +234,48 @@ fn handle_file_request(
                 Err(e) => state.set_status(format!("No se pudo guardar {}: {e}", file_name(&path)), true),
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn args(theme: Option<&str>, color: ColorChoice) -> TuiArgs {
+        let themes = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../themes");
+        TuiArgs { theme: theme.map(String::from), theme_dir: themes, color, ..TuiArgs::default() }
+    }
+
+    #[test]
+    fn without_a_theme_the_basic_palette_is_used() {
+        let (p, note) = choose_palette(&args(None, ColorChoice::Auto), Some("truecolor"));
+        assert_eq!(p, Palette::basic());
+        assert!(note.is_none());
+    }
+
+    #[test]
+    fn a_theme_applies_when_the_terminal_has_24_bits() {
+        let (p, note) = choose_palette(&args(Some("nord"), ColorChoice::Auto), Some("truecolor"));
+        assert!(note.is_none());
+        assert!(p.background.is_some());
+        let forced = choose_palette(&args(Some("nord"), ColorChoice::Truecolor), None).0;
+        assert_eq!(p, forced, "--color truecolor equivale a que el terminal lo anuncie");
+    }
+
+    #[test]
+    fn a_theme_on_a_16_color_terminal_falls_back_and_says_so() {
+        let (p, note) = choose_palette(&args(Some("nord"), ColorChoice::Auto), None);
+        assert_eq!(p, Palette::basic());
+        assert!(note.unwrap().0.contains("16 colores"));
+        let (p, _) = choose_palette(&args(Some("nord"), ColorChoice::Basic), Some("truecolor"));
+        assert_eq!(p, Palette::basic(), "--color basic manda sobre COLORTERM");
+    }
+
+    #[test]
+    fn a_broken_theme_falls_back_with_an_error() {
+        let (p, note) = choose_palette(&args(Some("no-existe"), ColorChoice::Truecolor), None);
+        assert_eq!(p, Palette::basic());
+        let (text, error) = note.unwrap();
+        assert!(error && text.contains("no-existe"), "{text}");
     }
 }

@@ -8,6 +8,7 @@ mod play;
 mod session;
 mod shared;
 mod stats;
+mod themes;
 mod tui;
 
 use anyhow::Result;
