@@ -10,9 +10,9 @@ terminal gráfico. La solución elegida es:
 
 Se descartaron `kmscon` (más ligero pero con menos soporte y pruebas) y `fbterm` (solo 256 colores).
 
-> **Estado:** los scripts y los temas están probados en el PC (con un `cage` simulado) y la
-> interfaz emite colores de 24 bits correctos, pero **cage y foot aún no se han instalado ni
-> probado en la Pi 2**. Por eso el arranque automático es opcional y se prueba antes a mano.
+> **Estado:** probado a mano en la Pi 2 por el autor: `./pi-kiosk.sh install` y el arranque con
+> `cage` + `foot` funcionan con el color de 24 bits y el tema. Los scripts además se probaron en
+> el PC con un `cage` simulado. El arranque automático (`enable`) es opcional y reversible.
 
 ## Antes de empezar
 

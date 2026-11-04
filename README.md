@@ -23,7 +23,7 @@ pantalla Files (F5) para cargar y guardar. Pendiente de probar a oído. Ver
 [docs/HITO4.md](docs/HITO4.md).
 
 Color de 24 bits y temas (`--theme dracula`, `solarized-dark`, `gruvbox-dark`, `nord`) y un kiosco
-cage + foot para la Pi, aún sin probar en la Pi. Ver [docs/KIOSK.md](docs/KIOSK.md). El audio se
+cage + foot para la Pi, probado en la Pi 2. Ver [docs/KIOSK.md](docs/KIOSK.md). El audio se
 reabre solo si el dispositivo se desconecta: [docs/AUDIO.md](docs/AUDIO.md).
 
 ## Estructura
