@@ -91,6 +91,19 @@ pub struct Edit {
     pub value: f32,
 }
 
+/// Si el hilo de audio tiene prioridad de tiempo real.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum Realtime {
+    #[default]
+    Pending,
+    /// Desactivado a propósito.
+    Off,
+    /// Activo con esta prioridad.
+    Active(i32),
+    /// El sistema no lo permite (falta el permiso).
+    Denied,
+}
+
 #[derive(Debug, Clone)]
 pub struct UiState {
     pub screen: Screen,
@@ -106,6 +119,11 @@ pub struct UiState {
     pub cpu_load: f32,
     pub misses: u64,
     pub errors: u64,
+    /// Callbacks de audio que llegaron tarde (el hilo tardó en ejecutarse).
+    pub late: u64,
+    /// Mayor hueco entre dos callbacks seguidos, en milisegundos.
+    pub max_gap_ms: f32,
+    pub realtime: Realtime,
     pub midi_port: String,
     pub audio_info: String,
     /// El dispositivo de audio se perdió y se está reintentando abrirlo.
@@ -137,6 +155,9 @@ impl Default for UiState {
             cpu_load: 0.0,
             misses: 0,
             errors: 0,
+            late: 0,
+            max_gap_ms: 0.0,
+            realtime: Realtime::Pending,
             midi_port: String::new(),
             audio_info: String::new(),
             audio_lost: false,

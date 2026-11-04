@@ -3,7 +3,7 @@
 //! consola del kernel y por SSH) y con un tema, colores RGB de 24 bits.
 
 use crate::format::{bar, note_name, param_value, waveform_name};
-use crate::state::{Screen, UiState};
+use crate::state::{Realtime, Screen, UiState};
 use crate::theme::Palette;
 use distrodaw_engine::{ParamId, ParamKind, SPECS};
 use ratatui::layout::{Constraint, Layout, Rect};
@@ -62,6 +62,7 @@ fn draw_play(frame: &mut Frame, area: Rect, state: &UiState, p: &Palette) {
         row("Patch", &state.patch, p),
         row("MIDI", if state.midi_port.is_empty() { "-" } else { &state.midi_port }, p),
         row("Audio", if state.audio_info.is_empty() { "-" } else { &state.audio_info }, p),
+        realtime_row(state.realtime, p),
         Line::raw(""),
         Line::from(vec![
             Span::styled(format!("{:<8}", "Voces"), p.label_style()),
@@ -71,6 +72,16 @@ fn draw_play(frame: &mut Frame, area: Rect, state: &UiState, p: &Palette) {
         row("Notas", &notes, p),
     ];
     frame.render_widget(Paragraph::new(lines).block(block), area);
+}
+
+fn realtime_row<'a>(rt: Realtime, p: &Palette) -> Line<'a> {
+    let (text, style) = match rt {
+        Realtime::Active(prio) => (format!("activo (SCHED_FIFO {prio})"), Style::new().fg(p.ok)),
+        Realtime::Denied => ("NO: falta permiso (docs/AUDIO.md)".to_string(), Style::new().fg(p.warn)),
+        Realtime::Off => ("desactivado".to_string(), p.label_style()),
+        Realtime::Pending => ("-".to_string(), p.label_style()),
+    };
+    Line::from(vec![Span::styled(format!("{:<8}", "T. real"), p.label_style()), Span::styled(text, style)])
 }
 
 fn row<'a>(label: &str, value: &str, p: &Palette) -> Line<'a> {
@@ -210,6 +221,10 @@ fn draw_footer(frame: &mut Frame, area: Rect, state: &UiState, p: &Palette) {
         Span::styled(format!("{:.0}%", state.cpu_load * 100.0), Style::new().fg(cpu_color)),
         Span::styled("  xruns ", p.label_style()),
         Span::styled(xruns.to_string(), Style::new().fg(if xruns > 0 { p.alert } else { p.ok })),
+        Span::styled("  tarde ", p.label_style()),
+        Span::styled(state.late.to_string(), Style::new().fg(if state.late > 0 { p.warn } else { p.ok })),
+        Span::styled("  hueco ", p.label_style()),
+        Span::raw(format!("{:.1}ms", state.max_gap_ms)),
     ]);
     frame.render_widget(Paragraph::new(Line::from(spans)).block(block), area);
 }
@@ -464,5 +479,33 @@ mod tests {
         assert!(filled.iter().all(|&c| c == p.ok));
         let empty = (0..80).find(|&x| buffer[(x, row)].symbol() == "░").unwrap();
         assert_eq!(buffer[(empty, row)].fg, p.label);
+    }
+
+    #[test]
+    fn footer_shows_late_callbacks_and_the_largest_gap() {
+        let mut s = UiState::default();
+        s.late = 3;
+        s.max_gap_ms = 12.34;
+        let out = render(&s, 80, 20);
+        assert!(contains(&out, "tarde 3"));
+        assert!(contains(&out, "hueco 12.3ms"));
+        // Con valores grandes sigue cabiendo en 80 columnas.
+        s.late = 12_345;
+        s.misses = 999;
+        s.max_gap_ms = 123.4;
+        let out = render(&s, 80, 20);
+        let footer = &out[out.len() - 2];
+        assert!(footer.contains("hueco 123.4ms"), "{footer}");
+    }
+
+    #[test]
+    fn play_screen_reports_the_real_time_status() {
+        let mut s = UiState::default();
+        s.realtime = Realtime::Active(70);
+        assert!(contains(&render(&s, 80, 20), "activo (SCHED_FIFO 70)"));
+        s.realtime = Realtime::Denied;
+        assert!(contains(&render(&s, 80, 20), "falta permiso"));
+        s.realtime = Realtime::Off;
+        assert!(contains(&render(&s, 80, 20), "desactivado"));
     }
 }

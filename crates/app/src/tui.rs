@@ -4,11 +4,12 @@ use crate::audio::AudioArgs;
 use crate::midi::Midi;
 use crate::patches::{self, Watcher};
 use crate::themes;
+use crate::stats;
 use crate::session::{self, AudioEvent, Mode, Session};
 use anyhow::Result;
 use clap::{Args, ValueEnum};
 use distrodaw_engine::Patch;
-use distrodaw_tui::{next_action, ColorMode, FileRequest, Palette, Tui, UiState};
+use distrodaw_tui::{next_action, ColorMode, FileRequest, Palette, Realtime, Tui, UiState};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
@@ -123,6 +124,14 @@ pub fn run(audio_args: &AudioArgs, args: &TuiArgs) -> Result<()> {
         state.cpu_load = report.interval_avg_load as f32;
         state.misses = report.misses;
         state.errors = report.stream_errors + report.xruns;
+        state.late = report.late;
+        state.max_gap_ms = report.max_gap_ms as f32;
+        state.realtime = match report.realtime {
+            stats::Realtime::Pending => Realtime::Pending,
+            stats::Realtime::Off => Realtime::Off,
+            stats::Realtime::Active(p) => Realtime::Active(p),
+            stats::Realtime::Denied(_) => Realtime::Denied,
+        };
         state.tick();
 
         if last_refresh.elapsed() >= REFRESH_FILES {
