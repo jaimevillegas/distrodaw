@@ -4,6 +4,7 @@ mod audio;
 mod bench;
 mod midi;
 mod play;
+mod shared;
 mod stats;
 
 use anyhow::Result;
