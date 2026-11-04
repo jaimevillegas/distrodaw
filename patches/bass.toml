@@ -1,0 +1,13 @@
+name = "Bass"
+
+[oscillator]
+waveform = "square"
+
+[envelope]
+attack = 0.005
+decay = 0.3
+sustain = 0.5
+release = 0.1
+
+[output]
+volume = 0.5

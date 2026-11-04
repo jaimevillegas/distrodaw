@@ -7,6 +7,9 @@ use crate::params::ParamId;
 pub enum EventKind {
     NoteOn { note: u8, velocity: u8 },
     NoteOff { note: u8 },
+    /// Suelta todas las notas (MIDI CC 123). Sirve para no dejar notas colgadas
+    /// cuando se pierde la entrada o el audio.
+    AllNotesOff,
     SetParam { id: ParamId, value: f32 },
 }
 
@@ -29,6 +32,10 @@ impl Event {
 
     pub fn note_off(frame: u32, note: u8) -> Self {
         Self::new(frame, EventKind::NoteOff { note })
+    }
+
+    pub fn all_notes_off(frame: u32) -> Self {
+        Self::new(frame, EventKind::AllNotesOff)
     }
 
     pub fn set_param(frame: u32, id: ParamId, value: f32) -> Self {

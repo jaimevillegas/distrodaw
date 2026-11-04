@@ -9,6 +9,7 @@ pub mod env;
 pub mod event;
 pub mod osc;
 pub mod params;
+pub mod patch;
 pub mod synth;
 pub mod voice;
 
@@ -18,4 +19,5 @@ pub use event::{Event, EventKind};
 pub use osc::Sine;
 pub use synth::{Synth, VOICES};
 pub use voice::{midi_to_hz, Voice, Waveform};
+pub use patch::{Patch, PatchError};
 pub use params::{ParamId, ParamKind, ParamSpec, Params, PARAM_COUNT, SPECS};

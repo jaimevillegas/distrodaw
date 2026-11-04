@@ -7,6 +7,8 @@
 //! | ← → (h l) | Ajuste normal (2 %) |
 //! | Mayús + ← →, `,` `.` | Ajuste fino (0,4 %) |
 //! | RePág / AvPág | Ajuste grueso (10 %) |
+//! | F5 | Pantalla Files |
+//! | Enter, `s`, `n` | En Files: cargar, guardar sobre el seleccionado, guardar nuevo |
 //! | q, Ctrl+C | Salir |
 //!
 //! El ajuste fino también está en `,` y `.` porque la consola del kernel no
@@ -27,7 +29,11 @@ pub fn action_for_key(key: KeyEvent) -> Option<Action> {
         KeyCode::Char('q') => Some(Action::Quit),
         KeyCode::F(1) => Some(Action::Screen(Screen::Play)),
         KeyCode::F(2) => Some(Action::Screen(Screen::Synth)),
+        KeyCode::F(5) => Some(Action::Screen(Screen::Files)),
         KeyCode::Tab => Some(Action::NextScreen),
+        KeyCode::Enter => Some(Action::Confirm),
+        KeyCode::Char('s') => Some(Action::Save),
+        KeyCode::Char('n') => Some(Action::SaveNew),
         KeyCode::Up | KeyCode::Char('k') => Some(Action::Up),
         KeyCode::Down | KeyCode::Char('j') => Some(Action::Down),
         KeyCode::Left | KeyCode::Char('h') => Some(Action::Adjust { direction: -1, step: horizontal }),
@@ -72,6 +78,14 @@ mod tests {
         assert_eq!(press(KeyCode::Char(',')), Some(Action::Adjust { direction: -1, step: Step::Fine }));
         assert_eq!(press(KeyCode::PageUp), Some(Action::Adjust { direction: 1, step: Step::Coarse }));
         assert_eq!(press(KeyCode::PageDown), Some(Action::Adjust { direction: -1, step: Step::Coarse }));
+    }
+
+    #[test]
+    fn files_screen_keys() {
+        assert_eq!(press(KeyCode::F(5)), Some(Action::Screen(Screen::Files)));
+        assert_eq!(press(KeyCode::Enter), Some(Action::Confirm));
+        assert_eq!(press(KeyCode::Char('s')), Some(Action::Save));
+        assert_eq!(press(KeyCode::Char('n')), Some(Action::SaveNew));
     }
 
     #[test]

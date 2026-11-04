@@ -15,8 +15,12 @@ Hito 2 implementado: sinte polifónico de 8 voces con ADSR y parámetros con ID,
 controlado por teclado MIDI (`distrodaw play`). Probado con un puerto MIDI virtual y
 con un teclado USB real en la Pi 2; pendiente medir la latencia real. Ver [docs/HITO2.md](docs/HITO2.md).
 
-Hito 3 en curso: interfaz de terminal con pantallas Play y Synth (`distrodaw`), manejada
-con teclado; el joystick queda pendiente. Ver [docs/HITO3.md](docs/HITO3.md).
+Hito 3 completado: interfaz de terminal con pantallas Play y Synth (`distrodaw`), manejada
+con teclado (el joystick queda como opcional para el futuro). Ver [docs/HITO3.md](docs/HITO3.md).
+
+Hito 4 implementado: sintes como patches en TOML (`patches/`), con recarga en caliente y
+pantalla Files (F5) para cargar y guardar. Pendiente de probar a oído. Ver
+[docs/HITO4.md](docs/HITO4.md).
 
 ## Estructura
 
@@ -37,6 +41,7 @@ cargo run --release -p distrodaw -- devices
 cargo run --release -p distrodaw -- midi-ports
 cargo run --release -p distrodaw -- play --monitor
 cargo run --release -p distrodaw            # interfaz de terminal
+cargo run --release -p distrodaw -- tui --patch patches/pad.toml   # con un patch que se recarga al guardar
 cargo run --release -p distrodaw -- bench --buffer 128 --rate 48000 --voices 16 --seconds 5
 ```
 
@@ -65,7 +70,7 @@ está en `Cross.toml`.
 - [x] 0. Oscilador sonando en PC
 - [x] 1. Compilar a Pi 2 y medir latencia/CPU con el Volt 2
 - [x] 2. Teclado MIDI → sinte de 8 voces con ADSR
-- [ ] 3. TUI (Play, Synth, Seq, Files)
+- [x] 3. TUI (Play, Synth; joystick opcional más adelante)
 - [ ] 4. Patches desde archivo (TOML)
 - [ ] 5. Secuenciador tipo tracker y grabación a .mid
 - [ ] 6. Imagen de arranque directo (Buildroot o Raspberry Pi OS Lite)

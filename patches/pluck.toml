@@ -1,0 +1,13 @@
+name = "Pluck"
+
+[oscillator]
+waveform = "triangle"
+
+[envelope]
+attack = 0.001
+decay = 0.25
+sustain = 0.0
+release = 0.2
+
+[output]
+volume = 0.6

@@ -23,9 +23,17 @@ pub struct Synth {
 
 impl Synth {
     pub fn new(sample_rate: f32) -> Self {
-        let params = Params::default();
+        Self::with_params(sample_rate, Params::default())
+    }
+
+    /// Sinte nuevo con unos parámetros de partida (p. ej. al cambiar de frecuencia de muestreo).
+    pub fn with_params(sample_rate: f32, params: Params) -> Self {
         let coefs = Self::coefs_for(sample_rate, &params);
         Self { sample_rate, params, coefs, voices: [Voice::default(); VOICES], counter: 0 }
+    }
+
+    pub fn sample_rate(&self) -> f32 {
+        self.sample_rate
     }
 
     pub fn params(&self) -> &Params {
@@ -80,6 +88,11 @@ impl Synth {
             EventKind::NoteOn { note, velocity: 0 } => self.note_off(note),
             EventKind::NoteOn { note, velocity } => self.note_on(note, velocity),
             EventKind::NoteOff { note } => self.note_off(note),
+            EventKind::AllNotesOff => {
+                for voice in self.voices.iter_mut().filter(|v| v.gate()) {
+                    voice.note_off();
+                }
+            }
             EventKind::SetParam { id, value } => {
                 self.params.set(id, value);
                 if matches!(id, ParamId::Attack | ParamId::Decay | ParamId::Sustain | ParamId::Release) {
@@ -227,5 +240,25 @@ mod tests {
         let notes: Vec<Event> = (0..8).map(|i| Event::note_on(0, 48 + i, 127)).collect();
         let out = render(&mut s, &notes, 9_600);
         assert!(peak(&out) <= 1.0);
+    }
+
+    #[test]
+    fn all_notes_off_releases_every_held_note() {
+        let mut s = Synth::new(SR);
+        let notes: Vec<Event> = (0..5).map(|i| Event::note_on(0, 60 + i, 100)).collect();
+        render(&mut s, &notes, 480);
+        assert!(s.voices.iter().filter(|v| v.gate()).count() == 5);
+        render(&mut s, &[Event::all_notes_off(0)], 16);
+        assert!(!s.voices.iter().any(|v| v.gate()));
+        assert_eq!(s.active_voices(), 5, "siguen en relajación, sin cortes secos");
+    }
+
+    #[test]
+    fn with_params_starts_from_the_given_values() {
+        let mut params = Params::default();
+        params.set(ParamId::Release, 2.0);
+        let s = Synth::with_params(44_100.0, params);
+        assert_eq!(s.sample_rate(), 44_100.0);
+        assert_eq!(s.params().get(ParamId::Release), 2.0);
     }
 }

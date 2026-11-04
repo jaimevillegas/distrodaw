@@ -8,8 +8,8 @@ license.workspace = true
 [dependencies]
 distrodaw-engine = { path = "../engine" }
 distrodaw-tui = { path = "../tui" }
-cpal = "0.15"
+cpal = "0.18"
 anyhow = "1"
 clap = { version = "4", features = ["derive"] }
-midir = "0.10"
+midir = "0.11"
 rtrb = "0.3"

@@ -3,6 +3,7 @@
 mod audio;
 mod bench;
 mod midi;
+mod patches;
 mod play;
 mod session;
 mod shared;

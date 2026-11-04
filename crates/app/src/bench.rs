@@ -54,14 +54,14 @@ pub fn run(audio_args: &AudioArgs, args: &BenchArgs) -> Result<()> {
     } else {
         println!("Sonando {} voz/voces durante {} s...", args.voices, args.seconds);
     }
-    let rate = output.sample_rate;
+    let rate = output.info.sample_rate;
     let buffer_ms = |frames: u64| frames as f64 * 1000.0 / f64::from(rate);
     for _ in 0..args.seconds {
         std::thread::sleep(Duration::from_secs(1));
         let r = stats.take_report(rate);
         // Sin buffer fijo se desconoce el del dispositivo: se muestra el
         // tamaño del último callback como referencia.
-        let buffer = output.device_buffer.unwrap_or(r.frames_per_callback);
+        let buffer = output.info.device_buffer.unwrap_or(r.frames_per_callback);
         println!(
             "buffer {} frames ({:.2} ms) | callback {} frames | carga media {:.1} % | pico del intervalo {:.1} % | plazos perdidos {} | errores {}",
             buffer,
@@ -75,7 +75,7 @@ pub fn run(audio_args: &AudioArgs, args: &BenchArgs) -> Result<()> {
     }
 
     let r = stats.take_report(rate);
-    let buffer = output.device_buffer.unwrap_or(r.frames_per_callback);
+    let buffer = output.info.device_buffer.unwrap_or(r.frames_per_callback);
     println!(
         "RESUMEN callbacks={} buffer_frames={} buffer_ms={:.2} callback_frames={} carga_media={:.1}% pico={:.1}% pico_ms={:.2} plazos_perdidos={} errores={}",
         r.callbacks,
