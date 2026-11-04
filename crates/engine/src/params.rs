@@ -94,7 +94,7 @@ impl ParamId {
 }
 
 /// Valores actuales de todos los parámetros. Tamaño fijo: no reserva memoria.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Params {
     values: [f32; PARAM_COUNT],
 }
