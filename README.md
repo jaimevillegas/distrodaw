@@ -11,6 +11,10 @@ Hito 1 completado: banco de pruebas de audio (`distrodaw --help`) y mediciones e
 Pi 2 con el Volt 2 (buffers de 64 a 256 frames, hasta 64 sinusoides sin cortes).
 Ver [docs/HITO1.md](docs/HITO1.md).
 
+Hito 2 implementado: sinte polifónico de 8 voces con ADSR y parámetros con ID,
+controlado por teclado MIDI (`distrodaw play`). Probado con un puerto MIDI virtual;
+pendiente de probar con el teclado real. Ver [docs/HITO2.md](docs/HITO2.md).
+
 ## Estructura
 
 | Crate | Función |
@@ -27,6 +31,8 @@ Requisitos: Rust estable y, en Linux, `libasound2-dev` (Debian/Ubuntu) o
 ```sh
 cargo test -p distrodaw-engine
 cargo run --release -p distrodaw -- devices
+cargo run --release -p distrodaw -- midi-ports
+cargo run --release -p distrodaw -- play --monitor
 cargo run --release -p distrodaw -- bench --buffer 128 --rate 48000 --voices 16 --seconds 5
 ```
 
