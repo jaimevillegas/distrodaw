@@ -3,6 +3,7 @@
 mod audio;
 mod bench;
 mod midi;
+mod play;
 mod stats;
 
 use anyhow::Result;
@@ -26,6 +27,8 @@ enum Command {
     MidiPorts,
     /// Banco de pruebas: sinusoides simultáneas y métricas de CPU.
     Bench(bench::BenchArgs),
+    /// Toca el sinte con un teclado MIDI.
+    Play(play::PlayArgs),
 }
 
 fn main() -> Result<()> {
@@ -34,5 +37,6 @@ fn main() -> Result<()> {
         Command::Devices => audio::list_devices(),
         Command::MidiPorts => midi::list_ports(),
         Command::Bench(args) => bench::run(&cli.audio, &args),
+        Command::Play(args) => play::run(&cli.audio, &args),
     }
 }

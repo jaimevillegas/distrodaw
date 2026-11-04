@@ -1,7 +1,8 @@
 //! Entrada MIDI: listado de puertos e interpretación de mensajes.
 
-use anyhow::{anyhow, Result};
-use midir::MidiInput;
+use anyhow::{anyhow, bail, Result};
+use distrodaw_engine::EventKind;
+use midir::{MidiInput, MidiInputPort};
 
 /// Mensaje MIDI de canal ya interpretado. Se ignora el canal (modo omni).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -26,6 +27,35 @@ pub fn parse(bytes: &[u8]) -> Option<Midi> {
             Some(Midi::ControlChange { controller: controller & 0x7F, value: value & 0x7F })
         }
         _ => None,
+    }
+}
+
+/// Traduce un mensaje MIDI al evento que entiende el motor.
+pub fn to_event(msg: Midi) -> Option<EventKind> {
+    match msg {
+        Midi::NoteOn { note, velocity } => Some(EventKind::NoteOn { note, velocity }),
+        Midi::NoteOff { note } => Some(EventKind::NoteOff { note }),
+        Midi::ControlChange { .. } => None,
+    }
+}
+
+/// Elige el puerto cuyo nombre contiene `filter`; sin filtro, el primero que
+/// no sea el puerto virtual «Midi Through».
+pub fn pick_port(input: &MidiInput, filter: Option<&str>) -> Result<MidiInputPort> {
+    let filter = filter.map(str::to_lowercase);
+    for port in input.ports() {
+        let name = input.port_name(&port).map_err(|e| anyhow!("{e}"))?.to_lowercase();
+        let wanted = match &filter {
+            Some(f) => name.contains(f.as_str()),
+            None => !name.contains("midi through"),
+        };
+        if wanted {
+            return Ok(port);
+        }
+    }
+    match filter {
+        Some(f) => bail!("ningún puerto MIDI coincide con {f:?}; usa `midi-ports`"),
+        None => bail!("no hay teclado MIDI conectado; usa `midi-ports` para ver los puertos"),
     }
 }
 
@@ -68,6 +98,15 @@ mod tests {
             parse(&[0xB0, 73, 127]),
             Some(Midi::ControlChange { controller: 73, value: 127 })
         );
+    }
+
+    #[test]
+    fn notes_become_engine_events() {
+        assert_eq!(
+            to_event(Midi::NoteOn { note: 60, velocity: 90 }),
+            Some(EventKind::NoteOn { note: 60, velocity: 90 })
+        );
+        assert_eq!(to_event(Midi::NoteOff { note: 60 }), Some(EventKind::NoteOff { note: 60 }));
     }
 
     #[test]

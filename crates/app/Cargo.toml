@@ -12,3 +12,4 @@ cpal = "0.15"
 anyhow = "1"
 clap = { version = "4", features = ["derive"] }
 midir = "0.10"
+rtrb = "0.3"
