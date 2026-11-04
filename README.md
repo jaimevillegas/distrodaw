@@ -7,7 +7,8 @@ cópialo, modifícalo y úsalo para lo que quieras.
 
 ## Estado
 
-Hito 0: una sinusoide de 440 Hz por la salida de audio por defecto.
+Hito 1 en curso: banco de pruebas de audio (`distrodaw --help`) para medir carga de CPU y
+plazos perdidos en la Pi 2. Ver [docs/HITO1.md](docs/HITO1.md).
 
 ## Estructura
 
@@ -24,7 +25,8 @@ Requisitos: Rust estable y, en Linux, `libasound2-dev` (Debian/Ubuntu) o
 
 ```sh
 cargo test -p distrodaw-engine
-cargo run --release -p distrodaw
+cargo run --release -p distrodaw -- --list-devices
+cargo run --release -p distrodaw -- --buffer 128 --rate 48000 --voices 16 --seconds 5
 ```
 
 ## Compilar para Raspberry Pi 2 (ARMv7)
@@ -32,7 +34,7 @@ cargo run --release -p distrodaw
 ```sh
 cargo install cross
 cross build --release --target armv7-unknown-linux-gnueabihf -p distrodaw
-scp target/armv7-unknown-linux-gnueabihf/release/distrodaw pi@raspberrypi.local:~
+scripts/deploy-pi.sh pi@raspberrypi.local   # compila y copia binario y banco de pruebas
 ```
 
 `cross` necesita Docker o Podman. La configuración de `libasound2` para ARM
