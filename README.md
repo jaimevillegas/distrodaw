@@ -7,7 +7,9 @@ cópialo, modifícalo y úsalo para lo que quieras.
 
 ## Estado
 
-Hito 0: una sinusoide de 440 Hz por la salida de audio por defecto.
+Hito 1 completado: banco de pruebas de audio (`distrodaw --help`) y mediciones en la
+Pi 2 con el Volt 2 (buffers de 64 a 256 frames, hasta 64 sinusoides sin cortes).
+Ver [docs/HITO1.md](docs/HITO1.md).
 
 ## Estructura
 
@@ -24,7 +26,8 @@ Requisitos: Rust estable y, en Linux, `libasound2-dev` (Debian/Ubuntu) o
 
 ```sh
 cargo test -p distrodaw-engine
-cargo run --release -p distrodaw
+cargo run --release -p distrodaw -- --list-devices
+cargo run --release -p distrodaw -- --buffer 128 --rate 48000 --voices 16 --seconds 5
 ```
 
 ## Compilar para Raspberry Pi 2 (ARMv7)
@@ -32,7 +35,7 @@ cargo run --release -p distrodaw
 ```sh
 cargo install cross
 cross build --release --target armv7-unknown-linux-gnueabihf -p distrodaw
-scp target/armv7-unknown-linux-gnueabihf/release/distrodaw pi@raspberrypi.local:~
+scripts/deploy-pi.sh pi@raspberrypi.local   # compila y copia binario y banco de pruebas
 ```
 
 `cross` necesita Docker o Podman. La configuración de `libasound2` para ARM
@@ -50,7 +53,7 @@ está en `Cross.toml`.
 ## Hitos
 
 - [x] 0. Oscilador sonando en PC
-- [ ] 1. Compilar a Pi 2 y medir latencia/CPU con el Volt 2
+- [x] 1. Compilar a Pi 2 y medir latencia/CPU con el Volt 2
 - [ ] 2. Teclado MIDI → sinte de 8 voces con ADSR
 - [ ] 3. TUI (Play, Synth, Seq, Files)
 - [ ] 4. Patches desde archivo (TOML)
