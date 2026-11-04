@@ -69,6 +69,13 @@ cd ~/distrodaw
 Debe abrir DistroDAW a pantalla completa con el fondo del tema. Pulsa `q` para salir. Dentro
 de un terminal de 24 bits, `./pi-kiosk.sh colortest` debe mostrar degradados suaves.
 
+**Mejora el audio con `tune`** (pide sudo; ver `docs/AUDIO.md`): da prioridad de tiempo real al
+hilo de audio y fija la CPU a máxima frecuencia. Cierra la sesión y vuelve a entrar después.
+
+```sh
+./pi-kiosk.sh tune
+```
+
 **Comprueba que el audio no se resiente.** Con el kiosco abierto, la TUI muestra `cpu` y
 `xruns` en el pie. Toca con ocho notas sostenidas unos minutos: `xruns` debe seguir en 0 y
 `cpu` debe quedar en pocos puntos porcentuales por encima de lo que daba la consola.
