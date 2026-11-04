@@ -71,8 +71,32 @@ También se puede lanzar una prueba suelta:
 
 ## 4. Resultados
 
-Pendiente de rellenar con la salida de `bench-pi.sh` en la Pi 2.
+### Jack de 3,5 mm de la Pi 2 (provisional)
 
-| Buffer (frames) | ms | Voces | Carga media | Pico | Plazos perdidos |
-|-----------------|----|-------|-------------|------|-----------------|
-|                 |    |       |             |      |                 |
+Medido el 2026-11-03 en una Pi 2 (ARMv7, Raspberry Pi OS 13 «trixie», 32 bits),
+con el gobernador `ondemand` (900 MHz) y el dispositivo `default:CARD=Headphones`
+a 44,1 kHz con el buffer por defecto. 5 s por prueba, sinusoides con `sin()`.
+
+| Voces | Buffer (frames) | ms | Carga media | Pico | Plazos perdidos |
+|-------|-----------------|----|-------------|------|-----------------|
+| 8     | 2206            | 50.0 | 8.4 %     | 11.6 % | 0 |
+| 16    | 2195            | 49.8 | 15.0 %    | 22.8 % | 0 |
+| 32    | 2206            | 50.0 | 27.9 %    | 44.9 % | 0 |
+| 64    | 2241            | 50.8 | 46.3 %    | 88.5 % | 0 |
+| 128   | 1328            | 30.1 | 90.3 %    | 296.6 % | 4 |
+| 256   | 1517            | 34.4 | 179.7 %   | 527.7 % | 53 |
+
+Lectura: una sinusoide cuesta cerca de un 1 % de CPU, y hasta 64 voces
+no hay plazos perdidos. Una voz real (2 osciladores, filtro, 2 envolventes,
+LFO) costará varias veces más, así que la polifonía real se medirá en el
+Hito 2.
+
+### Pendiente
+
+- **Volt 2:** no aparecía en `lsusb` ni en `aplay -l`, así que no se ha medido.
+  Las mediciones con buffer de 64 a 128 frames a 48 kHz requieren el Volt 2.
+- **Jack con buffer fijo:** con `--buffer` (64, 128, 256 fallan con
+  `Invalid argument`; 512 y 1024 abren pero inundan de `POLLERR`) no funciona
+  en `plughw:CARD=Headphones`. Solo va el buffer por defecto (~50 ms).
+- **CPU a frecuencia fija:** el gobernador `performance` necesita `sudo`; las
+  cifras anteriores se midieron con `ondemand`.
