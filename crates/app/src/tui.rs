@@ -18,6 +18,8 @@ use std::time::{Duration, Instant};
 const FRAME: Duration = Duration::from_millis(40);
 /// Cada cuánto se vuelve a leer la lista de patches de la carpeta.
 const REFRESH_FILES: Duration = Duration::from_secs(1);
+/// Cuánto pesa la medida nueva de carga de CPU en la que se muestra (0 a 1).
+const CPU_SMOOTHING: f32 = 0.1;
 /// Nombre del patch sin nombre propio; al guardarlo se usa el del archivo.
 const UNNAMED: &str = "Init";
 
@@ -121,7 +123,8 @@ pub fn run(audio_args: &AudioArgs, args: &TuiArgs) -> Result<()> {
         }
         state.audio_lost = session.audio_lost();
         let report = session.stats.take_report(session.info.sample_rate);
-        state.cpu_load = report.interval_avg_load as f32;
+        // Media móvil: el valor real oscila ±1 % en cada cuadro y obligaría a redibujar sin parar.
+        state.cpu_load += (report.interval_avg_load as f32 - state.cpu_load) * CPU_SMOOTHING;
         state.misses = report.misses;
         state.errors = report.stream_errors + report.xruns;
         state.late = report.late;
