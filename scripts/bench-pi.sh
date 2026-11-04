@@ -21,6 +21,7 @@ cd "$(dirname "$0")"
       echo "## buffer=$buffer voces=$voices"
       ./distrodaw "${args[@]}" --rate "$rate" --buffer "$buffer" --voices "$voices" --seconds "$seconds" \
         2>&1 | grep -E '^RESUMEN|^Error' || echo "FALLO al abrir el stream"
+      sleep 1  # deja que ALSA libere el dispositivo antes de la siguiente prueba
     done
   done
 } | tee "$out"
