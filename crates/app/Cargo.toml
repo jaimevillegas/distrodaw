@@ -1,0 +1,12 @@
+[package]
+name = "distrodaw"
+description = "DAW solo MIDI para terminal, pensado para arrancar directo en una Raspberry Pi."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+distrodaw-engine = { path = "../engine" }
+distrodaw-tui = { path = "../tui" }
+cpal = "0.15"
+anyhow = "1"
