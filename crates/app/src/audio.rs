@@ -30,6 +30,7 @@ pub struct AudioArgs {
 /// Stream de salida abierto. Mantenerlo vivo mantiene el audio sonando.
 pub struct Output {
     _stream: cpal::Stream,
+    pub device_name: String,
     pub sample_rate: u32,
     /// Buffer pedido con `--buffer`; `None` si se usa el del dispositivo.
     pub device_buffer: Option<u64>,
@@ -62,9 +63,11 @@ fn pick_device(host: &cpal::Host, filter: Option<&str>) -> Result<cpal::Device> 
 /// Abre la salida y empieza a sonar. `make_render` recibe la frecuencia de
 /// muestreo y devuelve la función que rellena cada trozo mono; esa función se
 /// ejecuta en el hilo de audio y no debe reservar memoria ni usar locks.
+/// Con `verbose` a `false` no escribe nada en la consola (lo necesita la TUI).
 pub fn open<R>(
     args: &AudioArgs,
     stats: &Arc<AudioStats>,
+    verbose: bool,
     make_render: impl FnOnce(f32) -> R,
 ) -> Result<Output>
 where
@@ -72,7 +75,10 @@ where
 {
     let host = cpal::default_host();
     let device = pick_device(&host, args.device.as_deref())?;
-    println!("Dispositivo: {}", device.name().unwrap_or_else(|_| "?".into()));
+    let device_name = device.name().unwrap_or_else(|_| "?".into());
+    if verbose {
+        println!("Dispositivo: {device_name}");
+    }
 
     let supported = device.default_output_config().context("config de salida")?;
     let sample_format = supported.sample_format();
@@ -83,13 +89,15 @@ where
     if let Some(frames) = args.buffer {
         config.buffer_size = BufferSize::Fixed(frames);
     }
-    println!("Config: {config:?} ({sample_format:?})");
+    if verbose {
+        println!("Config: {config:?} ({sample_format:?})");
+    }
 
     let render = make_render(config.sample_rate.0 as f32);
     let stream = match sample_format {
-        SampleFormat::F32 => build::<f32, R>(&device, &config, stats, render)?,
-        SampleFormat::I16 => build::<i16, R>(&device, &config, stats, render)?,
-        SampleFormat::U16 => build::<u16, R>(&device, &config, stats, render)?,
+        SampleFormat::F32 => build::<f32, R>(&device, &config, stats, verbose, render)?,
+        SampleFormat::I16 => build::<i16, R>(&device, &config, stats, verbose, render)?,
+        SampleFormat::U16 => build::<u16, R>(&device, &config, stats, verbose, render)?,
         other => return Err(anyhow!("formato de muestra no soportado: {other:?}")),
     };
     stream.play()?;
@@ -98,13 +106,14 @@ where
         BufferSize::Fixed(frames) => Some(u64::from(frames)),
         BufferSize::Default => None,
     };
-    Ok(Output { _stream: stream, sample_rate: config.sample_rate.0, device_buffer })
+    Ok(Output { _stream: stream, device_name, sample_rate: config.sample_rate.0, device_buffer })
 }
 
 fn build<T, R>(
     device: &cpal::Device,
     config: &cpal::StreamConfig,
     stats: &Arc<AudioStats>,
+    verbose: bool,
     mut render: R,
 ) -> Result<cpal::Stream>
 where
@@ -140,7 +149,9 @@ where
         },
         move |err| {
             err_stats.record_stream_error();
-            eprintln!("error de audio: {err}");
+            if verbose {
+                eprintln!("error de audio: {err}");
+            }
         },
         None,
     )?;

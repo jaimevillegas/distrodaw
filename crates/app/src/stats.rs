@@ -10,6 +10,9 @@ pub struct AudioStats {
     total_frames: AtomicU64,
     last_frames: AtomicU64,
     busy_ns: AtomicU64,
+    /// Valores de `busy_ns` y `total_frames` en el informe anterior.
+    prev_busy_ns: AtomicU64,
+    prev_frames: AtomicU64,
     /// Máximo desde el último informe.
     interval_max_ns: AtomicU64,
     /// Máximo de toda la ejecución.
@@ -24,6 +27,8 @@ pub struct Report {
     pub frames_per_callback: u64,
     /// Fracción media del tiempo de buffer usada por el callback (1.0 = 100 %).
     pub avg_load: f64,
+    /// Igual que `avg_load` pero solo desde el informe anterior; refleja la carga actual.
+    pub interval_avg_load: f64,
     /// Peor callback desde el informe anterior, como fracción del tiempo de buffer.
     pub interval_max_load: f64,
     /// Peor callback de toda la ejecución, como fracción del tiempo de buffer.
@@ -61,7 +66,13 @@ impl AudioStats {
         let frames = self.last_frames.load(Relaxed).max(1);
         let buffer_ns = (frames * 1_000_000_000 / sample_rate as u64).max(1) as f64;
         let played_ns = (self.total_frames.load(Relaxed) * 1_000_000_000 / sample_rate as u64).max(1);
+        let busy_ns = self.busy_ns.load(Relaxed);
+        let total_frames = self.total_frames.load(Relaxed);
+        let interval_busy = busy_ns.saturating_sub(self.prev_busy_ns.swap(busy_ns, Relaxed));
+        let interval_frames = total_frames.saturating_sub(self.prev_frames.swap(total_frames, Relaxed));
+        let interval_played_ns = (interval_frames * 1_000_000_000 / sample_rate as u64).max(1);
         Report {
+            interval_avg_load: interval_busy as f64 / interval_played_ns as f64,
             callbacks: self.callbacks.load(Relaxed),
             frames_per_callback: frames,
             avg_load: self.busy_ns.load(Relaxed) as f64 / played_ns as f64,
@@ -71,5 +82,37 @@ impl AudioStats {
             misses: self.misses.load(Relaxed),
             stream_errors: self.stream_errors.load(Relaxed),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const SR: u32 = 48_000;
+
+    #[test]
+    fn interval_load_follows_recent_callbacks_not_the_whole_run() {
+        let stats = AudioStats::default();
+        // 1000 frames (20,83 ms) usando 10 ms: carga ≈ 48 %.
+        stats.record(1000, Duration::from_millis(10), SR);
+        let first = stats.take_report(SR);
+        assert!((first.interval_avg_load - 0.48).abs() < 0.01);
+
+        // Un intervalo sin trabajo útil baja la carga, aunque la media total siga alta.
+        stats.record(1000, Duration::from_micros(100), SR);
+        let second = stats.take_report(SR);
+        assert!(second.interval_avg_load < 0.01);
+        assert!(second.avg_load > second.interval_avg_load);
+    }
+
+    #[test]
+    fn counts_deadline_misses() {
+        let stats = AudioStats::default();
+        stats.record(480, Duration::from_millis(20), SR); // buffer de 10 ms
+        stats.record(480, Duration::from_millis(1), SR);
+        let r = stats.take_report(SR);
+        assert_eq!(r.misses, 1);
+        assert_eq!(r.callbacks, 2);
     }
 }

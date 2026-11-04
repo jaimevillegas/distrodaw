@@ -18,4 +18,4 @@ pub use event::{Event, EventKind};
 pub use osc::Sine;
 pub use synth::{Synth, VOICES};
 pub use voice::{midi_to_hz, Voice, Waveform};
-pub use params::{ParamId, ParamSpec, Params, PARAM_COUNT, SPECS};
+pub use params::{ParamId, ParamKind, ParamSpec, Params, PARAM_COUNT, SPECS};
