@@ -11,15 +11,17 @@ pub const MAX_RECENT_NOTES: usize = 8;
 pub enum Screen {
     Play,
     Synth,
+    Files,
 }
 
 impl Screen {
-    pub const ALL: [Screen; 2] = [Screen::Play, Screen::Synth];
+    pub const ALL: [Screen; 3] = [Screen::Play, Screen::Synth, Screen::Files];
 
     pub fn next(self) -> Screen {
         match self {
             Screen::Play => Screen::Synth,
-            Screen::Synth => Screen::Play,
+            Screen::Synth => Screen::Files,
+            Screen::Files => Screen::Play,
         }
     }
 }
@@ -52,8 +54,35 @@ pub enum Action {
     Down,
     /// Sube (`direction` > 0) o baja el parámetro seleccionado.
     Adjust { direction: i8, step: Step },
+    /// Acepta la selección (en Files, carga el patch).
+    Confirm,
+    /// Guarda sobre el patch seleccionado (en Files).
+    Save,
+    /// Guarda como un patch nuevo (en Files).
+    SaveNew,
     Quit,
 }
+
+/// Operación con archivos que la interfaz pide a la app (la interfaz no toca el disco).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FileRequest {
+    /// Cargar el archivo número `n` de [`UiState::files`].
+    Load(usize),
+    /// Guardar los parámetros actuales sobre el archivo número `n`.
+    Save(usize),
+    /// Guardar los parámetros actuales en un archivo nuevo.
+    SaveNew,
+}
+
+/// Mensaje para el usuario, p. ej. el resultado de cargar un patch.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Status {
+    pub text: String,
+    pub error: bool,
+}
+
+/// Cuadros que se mantiene un mensaje de éxito (~5 s a 30 cuadros por segundo).
+const STATUS_FRAMES: u16 = 150;
 
 /// Cambio de parámetro que la interfaz pide al motor.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -80,6 +109,17 @@ pub struct UiState {
     pub midi_port: String,
     pub audio_info: String,
     pub patch: String,
+    /// Directorio de patches que se muestra en la pantalla Files.
+    pub patch_dir: String,
+    /// Nombres de archivo de los patches disponibles.
+    pub files: Vec<String>,
+    pub file_cursor: usize,
+    /// Archivo del que viene el patch actual, si viene de uno.
+    pub loaded_file: Option<String>,
+    pub status: Option<Status>,
+    status_frames: u16,
+    /// Operación pendiente que la app debe atender y vaciar con `take()`.
+    pub request: Option<FileRequest>,
     pub quit: bool,
 }
 
@@ -98,6 +138,13 @@ impl Default for UiState {
             midi_port: String::new(),
             audio_info: String::new(),
             patch: "Init".into(),
+            patch_dir: String::new(),
+            files: Vec::new(),
+            file_cursor: 0,
+            loaded_file: None,
+            status: None,
+            status_frames: 0,
+            request: None,
             quit: false,
         }
     }
@@ -120,10 +167,30 @@ impl UiState {
             Action::Down if self.screen == Screen::Synth => {
                 self.selected = (self.selected + 1) % PARAM_COUNT;
             }
+            Action::Up if self.screen == Screen::Files && !self.files.is_empty() => {
+                self.file_cursor = (self.file_cursor + self.files.len() - 1) % self.files.len();
+            }
+            Action::Down if self.screen == Screen::Files && !self.files.is_empty() => {
+                self.file_cursor = (self.file_cursor + 1) % self.files.len();
+            }
+            Action::Confirm if self.screen == Screen::Files && !self.files.is_empty() => {
+                self.request = Some(FileRequest::Load(self.file_cursor));
+            }
+            Action::Save if self.screen == Screen::Files && !self.files.is_empty() => {
+                self.request = Some(FileRequest::Save(self.file_cursor));
+            }
+            Action::SaveNew if self.screen == Screen::Files => {
+                self.request = Some(FileRequest::SaveNew);
+            }
             Action::Adjust { direction, step } if self.screen == Screen::Synth => {
                 return self.adjust(direction, step);
             }
-            Action::Up | Action::Down | Action::Adjust { .. } => {}
+            Action::Up
+            | Action::Down
+            | Action::Adjust { .. }
+            | Action::Confirm
+            | Action::Save
+            | Action::SaveNew => {}
         }
         None
     }
@@ -144,6 +211,27 @@ impl UiState {
         }
         self.params[self.selected] = value;
         Some(Edit { id, value })
+    }
+
+    /// Sustituye la lista de patches, conservando el cursor dentro de rango.
+    pub fn set_files(&mut self, files: Vec<String>) {
+        self.files = files;
+        self.file_cursor = self.file_cursor.min(self.files.len().saturating_sub(1));
+    }
+
+    /// Muestra un mensaje. Los de éxito caducan solos; los errores se quedan hasta el siguiente mensaje.
+    pub fn set_status(&mut self, text: impl Into<String>, error: bool) {
+        self.status = Some(Status { text: text.into(), error });
+        self.status_frames = if error { u16::MAX } else { STATUS_FRAMES };
+    }
+
+    /// Avanza un cuadro: hace caducar los mensajes de éxito.
+    pub fn tick(&mut self) {
+        match self.status_frames {
+            0 => self.status = None,
+            u16::MAX => {}
+            n => self.status_frames = n - 1,
+        }
     }
 
     pub fn note_on(&mut self, note: u8) {
@@ -175,6 +263,8 @@ mod tests {
         assert_eq!(s.screen, Screen::Play);
         s.apply(Action::NextScreen);
         assert_eq!(s.screen, Screen::Synth);
+        s.apply(Action::NextScreen);
+        assert_eq!(s.screen, Screen::Files);
         s.apply(Action::NextScreen);
         assert_eq!(s.screen, Screen::Play);
         s.apply(Action::Screen(Screen::Synth));
@@ -281,5 +371,77 @@ mod tests {
         assert!(s.peak < 0.8 && s.peak > 0.5);
         s.set_peak(5.0);
         assert_eq!(s.peak, 1.0);
+    }
+
+    fn files_state() -> UiState {
+        let mut s = UiState::default();
+        s.apply(Action::Screen(Screen::Files));
+        s.set_files(vec!["a.toml".into(), "b.toml".into(), "c.toml".into()]);
+        s
+    }
+
+    #[test]
+    fn file_cursor_wraps_and_requests_the_right_file() {
+        let mut s = files_state();
+        s.apply(Action::Up);
+        assert_eq!(s.file_cursor, 2);
+        s.apply(Action::Down);
+        s.apply(Action::Down);
+        assert_eq!(s.file_cursor, 1);
+
+        assert_eq!(s.apply(Action::Confirm), None);
+        assert_eq!(s.request.take(), Some(FileRequest::Load(1)));
+        s.apply(Action::Save);
+        assert_eq!(s.request.take(), Some(FileRequest::Save(1)));
+        s.apply(Action::SaveNew);
+        assert_eq!(s.request.take(), Some(FileRequest::SaveNew));
+    }
+
+    #[test]
+    fn file_actions_do_nothing_outside_the_files_screen_or_without_files() {
+        let mut s = UiState::default();
+        s.set_files(vec!["a.toml".into()]);
+        for action in [Action::Confirm, Action::Save, Action::SaveNew] {
+            s.apply(action);
+            assert_eq!(s.request, None, "{action:?} en Play");
+        }
+        let mut empty = UiState::default();
+        empty.apply(Action::Screen(Screen::Files));
+        empty.apply(Action::Confirm);
+        empty.apply(Action::Save);
+        assert_eq!(empty.request, None);
+        empty.apply(Action::SaveNew);
+        assert_eq!(empty.request, Some(FileRequest::SaveNew), "se puede crear el primero");
+    }
+
+    #[test]
+    fn shrinking_the_file_list_keeps_the_cursor_in_range() {
+        let mut s = files_state();
+        s.file_cursor = 2;
+        s.set_files(vec!["a.toml".into()]);
+        assert_eq!(s.file_cursor, 0);
+        s.set_files(Vec::new());
+        assert_eq!(s.file_cursor, 0);
+    }
+
+    #[test]
+    fn success_messages_expire_but_errors_stay() {
+        let mut s = UiState::default();
+        s.set_status("cargado", false);
+        for _ in 0..149 {
+            s.tick();
+        }
+        assert!(s.status.is_some());
+        s.tick();
+        s.tick();
+        assert_eq!(s.status, None);
+
+        s.set_status("fallo", true);
+        for _ in 0..10_000 {
+            s.tick();
+        }
+        assert_eq!(s.status, Some(Status { text: "fallo".into(), error: true }));
+        s.set_status("ok", false);
+        assert_eq!(s.status.as_ref().unwrap().text, "ok");
     }
 }

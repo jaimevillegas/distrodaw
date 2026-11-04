@@ -12,4 +12,4 @@ pub mod ui;
 
 pub use terminal::{next_action, Tui};
 pub use ui::draw;
-pub use state::{Action, Edit, Screen, Step, UiState};
+pub use state::{Action, Edit, FileRequest, Screen, Status, Step, UiState};
