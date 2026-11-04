@@ -78,6 +78,18 @@ impl WaveformName {
     }
 }
 
+/// Número con hasta cuatro decimales y siempre con punto (`1.0`, no `1`), para
+/// que el archivo sea legible y TOML lo lea como float.
+fn short(value: f32) -> String {
+    let text = format!("{value:.4}");
+    let trimmed = text.trim_end_matches('0');
+    if trimmed.ends_with('.') {
+        format!("{trimmed}0")
+    } else {
+        trimmed.to_string()
+    }
+}
+
 fn waveform_text(value: f32) -> &'static str {
     match value.round() as i32 {
         0 => "sine",
@@ -158,11 +170,11 @@ impl Patch {
              [output]\n\
              volume = {}   # 0.0 a 1.0\n",
             waveform_text(p.get(ParamId::Waveform)),
-            p.get(ParamId::Attack),
-            p.get(ParamId::Decay),
-            p.get(ParamId::Sustain),
-            p.get(ParamId::Release),
-            p.get(ParamId::Volume),
+            short(p.get(ParamId::Attack)),
+            short(p.get(ParamId::Decay)),
+            short(p.get(ParamId::Sustain)),
+            short(p.get(ParamId::Release)),
+            short(p.get(ParamId::Volume)),
         )
     }
 }
@@ -253,5 +265,19 @@ mod tests {
         assert!(text.contains("waveform = \"saw\""));
         assert!(text.contains("attack = 0.01 "));
         assert!(!text.contains("0.0099999"), "los floats deben salir cortos:\n{text}");
+    }
+
+    #[test]
+    fn saved_numbers_are_short_and_always_floats() {
+        let mut patch = Patch::default();
+        patch.params.set(ParamId::Decay, 0.271_562_07);
+        patch.params.set(ParamId::Sustain, 1.0);
+        patch.params.set(ParamId::Release, 3.0);
+        let text = patch.to_toml();
+        assert!(text.contains("decay = 0.2716\n"), "{text}");
+        assert!(text.contains("sustain = 1.0 "), "{text}");
+        assert!(text.contains("release = 3.0\n"), "{text}");
+        let back = Patch::from_toml(&text).unwrap();
+        assert!((back.params.get(ParamId::Decay) - 0.2716).abs() < 1e-6);
     }
 }
