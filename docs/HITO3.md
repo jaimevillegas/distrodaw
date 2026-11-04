@@ -73,13 +73,14 @@ distingue Mayús + flechas. La forma de onda cambia de uno en uno. Los tiempos
 - [x] Pi 2 con el Volt 2 (buffer 128, 48 kHz): carga de CPU ≈ 1 %, 0 xruns con la
       interfaz abierta.
 
+- [x] **Consola del kernel por HDMI** en la Pi 2, con monitor y teclado USB (comprobado
+      a mano por el autor): la interfaz funciona y los símbolos ▓ ░ ■ □ ▶ se ven bien.
+
 ## Pendiente
 
 - [ ] **Joystick / gamepad (`gilrs`):** no hay ninguno para probar; se añadirá como
       otra fuente de `Action` sin tocar la interfaz.
-- [ ] Probarla en la **consola del kernel por HDMI** con un teclado USB (16
-      colores, fuente de la consola: los símbolos ▓ ░ ■ □ ▶ pueden no existir en
-      todas las fuentes) y por **SSH** desde un terminal real.
+- [ ] Probarla por **SSH** desde un terminal real (hasta ahora solo en un pty de prueba).
 - [ ] Mensajes de `libasound` por `stderr`: salen al enumerar dispositivos al
       arrancar (antes de abrir la pantalla); no se han visto durante el uso.
 - [ ] Pantallas Seq, Song y Files (hitos 4 y 5).
