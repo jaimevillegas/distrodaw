@@ -1,0 +1,7 @@
+# Compilación cruzada a Raspberry Pi 2 (ARMv7, Raspberry Pi OS 32 bits)
+# Uso:  cargo install cross && cross build --release --target armv7-unknown-linux-gnueabihf -p distrodaw
+[target.armv7-unknown-linux-gnueabihf]
+pre-build = [
+    "dpkg --add-architecture $CROSS_DEB_ARCH",
+    "apt-get update && apt-get --assume-yes install libasound2-dev:$CROSS_DEB_ARCH",
+]
