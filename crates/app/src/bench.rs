@@ -4,7 +4,7 @@ use crate::audio::{self, AudioArgs};
 use crate::stats::AudioStats;
 use anyhow::Result;
 use clap::Args;
-use distrodaw_engine::SineBank;
+use distrodaw_engine::{Event, ParamId, SineBank, Synth, VOICES};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -14,6 +14,15 @@ pub struct BenchArgs {
     #[arg(long, default_value_t = 1)]
     voices: usize,
 
+    /// Usa el sinte real con 8 notas sostenidas en lugar de sinusoides
+    /// (`--voices` se ignora).
+    #[arg(long)]
+    synth: bool,
+
+    /// Forma de onda del sinte (0 seno, 1 sierra, 2 cuadrada, 3 triangular).
+    #[arg(long, default_value_t = 1.0)]
+    waveform: f32,
+
     /// Duración de la prueba en segundos.
     #[arg(long, default_value_t = 3)]
     seconds: u64,
@@ -22,16 +31,29 @@ pub struct BenchArgs {
 pub fn run(audio_args: &AudioArgs, args: &BenchArgs) -> Result<()> {
     let stats = Arc::new(AudioStats::default());
     let voices = args.voices;
-    let output = audio::open(audio_args, &stats, |rate| {
-        let mut bank = SineBank::new(rate, voices, 440.0);
+    let (use_synth, waveform) = (args.synth, args.waveform);
+    let output = audio::open(audio_args, &stats, move |rate| {
+        let mut bank = SineBank::new(rate, if use_synth { 0 } else { voices }, 440.0);
+        let mut synth = Synth::new(rate);
+        // Acorde de 8 notas sostenidas, enviado en el primer callback.
+        let mut chord = Some(chord_events(waveform));
         move |out: &mut [f32]| {
-            for sample in out.iter_mut() {
-                *sample = bank.next_sample() * 0.2;
+            if use_synth {
+                let events = chord.take();
+                synth.render(events.as_ref().map_or(&[][..], |e| &e[..]), out);
+            } else {
+                for sample in out.iter_mut() {
+                    *sample = bank.next_sample() * 0.2;
+                }
             }
         }
     })?;
 
-    println!("Sonando {} voz/voces durante {} s...", args.voices, args.seconds);
+    if use_synth {
+        println!("Sonando el sinte con {VOICES} notas durante {} s...", args.seconds);
+    } else {
+        println!("Sonando {} voz/voces durante {} s...", args.voices, args.seconds);
+    }
     let rate = output.sample_rate;
     let buffer_ms = |frames: u64| frames as f64 * 1000.0 / f64::from(rate);
     for _ in 0..args.seconds {
@@ -67,4 +89,14 @@ pub fn run(audio_args: &AudioArgs, args: &BenchArgs) -> Result<()> {
         r.stream_errors,
     );
     Ok(())
+}
+
+fn chord_events(waveform: f32) -> [Event; VOICES + 2] {
+    const NOTES: [u8; VOICES] = [48, 52, 55, 59, 60, 64, 67, 71];
+    let mut events = [Event::set_param(0, ParamId::Waveform, waveform); VOICES + 2];
+    events[1] = Event::set_param(0, ParamId::Sustain, 1.0);
+    for (slot, note) in events[2..].iter_mut().zip(NOTES) {
+        *slot = Event::note_on(0, note, 100);
+    }
+    events
 }
