@@ -2,7 +2,7 @@
 
 use crate::audio::AudioArgs;
 use crate::patches;
-use crate::session::{self, Mode};
+use crate::session::{self, AudioEvent, Mode};
 use anyhow::Result;
 use clap::Args;
 use std::io::Write;
@@ -37,13 +37,17 @@ pub fn run(audio_args: &AudioArgs, args: &PlayArgs) -> Result<()> {
     println!("MIDI: {}", session.midi_port.as_deref().unwrap_or("-"));
     println!("Toca el teclado. Ctrl+C para salir.");
 
-    let rate = session.output.info.sample_rate;
     let started = std::time::Instant::now();
     loop {
         std::thread::sleep(Duration::from_millis(500));
         // Nadie lee los mensajes en este modo: se vacía la cola para que no se llene.
         while session.midi_rx.pop().is_ok() {}
-        let r = session.stats.take_report(rate);
+        match session.check_audio() {
+            Some(AudioEvent::Lost) => println!("\nAudio perdido: el dispositivo se desconectó. Se reintenta solo."),
+            Some(AudioEvent::Restored) => println!("\nAudio recuperado."),
+            None => {}
+        }
+        let r = session.stats.take_report(session.info.sample_rate);
         print!(
             "\rvoces {}/8 | carga {:.1} % | pico {:.2} ms | plazos perdidos {} | errores {}   ",
             session.shared.voices(),

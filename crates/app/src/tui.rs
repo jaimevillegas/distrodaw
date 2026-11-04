@@ -3,7 +3,7 @@
 use crate::audio::AudioArgs;
 use crate::midi::Midi;
 use crate::patches::{self, Watcher};
-use crate::session::{self, Mode, Session};
+use crate::session::{self, AudioEvent, Mode, Session};
 use anyhow::Result;
 use clap::Args;
 use distrodaw_engine::Patch;
@@ -43,12 +43,10 @@ impl Default for TuiArgs {
 pub fn run(audio_args: &AudioArgs, args: &TuiArgs) -> Result<()> {
     // Sin `--midi` la interfaz arranca aunque no haya teclado conectado.
     let mut session = session::start(audio_args, args.midi.as_deref(), args.midi.is_some(), Mode::Tui)?;
-    let rate = session.output.info.sample_rate;
-
     let mut state = UiState::default();
     state.midi_port = session.midi_port.clone().unwrap_or_else(|| "(sin teclado MIDI)".into());
-    let buffer = session.output.info.device_buffer.map_or("auto".to_string(), |b| b.to_string());
-    state.audio_info = format!("{} · {rate} Hz · buffer {buffer}", session.output.info.device_name);
+    let buffer = session.info.device_buffer.map_or("auto".to_string(), |b| b.to_string());
+    state.audio_info = format!("{} · {} Hz · buffer {buffer}", session.info.device_name, session.info.sample_rate);
     state.patch_dir = args.patch_dir.display().to_string();
     state.set_files(patches::file_names(&args.patch_dir));
 
@@ -73,7 +71,19 @@ pub fn run(audio_args: &AudioArgs, args: &TuiArgs) -> Result<()> {
         state.params = session.shared.params();
         state.voices = session.shared.voices();
         state.set_peak(session.shared.take_peak());
-        let report = session.stats.take_report(rate);
+        match session.check_audio() {
+            Some(AudioEvent::Lost) => {
+                state.audio_lost = true;
+                state.set_status("Audio perdido: el dispositivo se desconectó. Se reintenta solo", true);
+            }
+            Some(AudioEvent::Restored) => {
+                state.audio_lost = false;
+                state.set_status("Audio recuperado", false);
+            }
+            None => {}
+        }
+        state.audio_lost = session.audio_lost();
+        let report = session.stats.take_report(session.info.sample_rate);
         state.cpu_load = report.interval_avg_load as f32;
         state.misses = report.misses;
         state.errors = report.stream_errors + report.xruns;

@@ -108,6 +108,8 @@ pub struct UiState {
     pub errors: u64,
     pub midi_port: String,
     pub audio_info: String,
+    /// El dispositivo de audio se perdió y se está reintentando abrirlo.
+    pub audio_lost: bool,
     pub patch: String,
     /// Directorio de patches que se muestra en la pantalla Files.
     pub patch_dir: String,
@@ -137,6 +139,7 @@ impl Default for UiState {
             errors: 0,
             midi_port: String::new(),
             audio_info: String::new(),
+            audio_lost: false,
             patch: "Init".into(),
             patch_dir: String::new(),
             files: Vec::new(),

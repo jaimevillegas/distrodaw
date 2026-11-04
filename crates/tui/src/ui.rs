@@ -189,6 +189,17 @@ fn draw_footer(frame: &mut Frame, area: Rect, state: &UiState) {
         Color::Green
     };
     let cpu_color = if state.cpu_load >= 0.8 || state.misses > 0 { Color::Red } else { Color::Green };
+    if state.audio_lost {
+        let alert = Line::from(vec![
+            Span::styled(
+                "AUDIO PERDIDO",
+                Style::new().fg(Color::Red).add_modifier(Modifier::BOLD),
+            ),
+            Span::styled(" · se reintenta solo · las notas no suenan", label_style()),
+        ]);
+        frame.render_widget(Paragraph::new(alert).block(block), area);
+        return;
+    }
     let line = Line::from(vec![
         Span::styled("OUT ", label_style()),
         Span::styled(bar(state.peak, METER_WIDTH), Style::new().fg(level_color)),
@@ -344,5 +355,16 @@ mod tests {
         let out = render(&s, 80, 20);
         assert!(contains(&out, "…"));
         assert!(out.iter().all(|l| l.chars().count() == 80));
+    }
+
+    #[test]
+    fn footer_warns_loudly_when_the_audio_device_is_lost() {
+        let mut s = UiState::default();
+        s.audio_lost = true;
+        let out = render(&s, 80, 20);
+        assert!(contains(&out, "AUDIO PERDIDO"));
+        assert!(!contains(&out, "OUT ▓"), "no se enseña un medidor que ya no se mueve");
+        s.audio_lost = false;
+        assert!(contains(&render(&s, 80, 20), "OUT "));
     }
 }

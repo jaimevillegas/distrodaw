@@ -23,9 +23,17 @@ pub struct Synth {
 
 impl Synth {
     pub fn new(sample_rate: f32) -> Self {
-        let params = Params::default();
+        Self::with_params(sample_rate, Params::default())
+    }
+
+    /// Sinte nuevo con unos parámetros de partida (p. ej. al cambiar de frecuencia de muestreo).
+    pub fn with_params(sample_rate: f32, params: Params) -> Self {
         let coefs = Self::coefs_for(sample_rate, &params);
         Self { sample_rate, params, coefs, voices: [Voice::default(); VOICES], counter: 0 }
+    }
+
+    pub fn sample_rate(&self) -> f32 {
+        self.sample_rate
     }
 
     pub fn params(&self) -> &Params {
@@ -243,5 +251,14 @@ mod tests {
         render(&mut s, &[Event::all_notes_off(0)], 16);
         assert!(!s.voices.iter().any(|v| v.gate()));
         assert_eq!(s.active_voices(), 5, "siguen en relajación, sin cortes secos");
+    }
+
+    #[test]
+    fn with_params_starts_from_the_given_values() {
+        let mut params = Params::default();
+        params.set(ParamId::Release, 2.0);
+        let s = Synth::with_params(44_100.0, params);
+        assert_eq!(s.sample_rate(), 44_100.0);
+        assert_eq!(s.params().get(ParamId::Release), 2.0);
     }
 }
