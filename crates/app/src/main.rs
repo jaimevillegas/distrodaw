@@ -7,7 +7,7 @@ use anyhow::{anyhow, Context, Result};
 use clap::Parser;
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use cpal::{BufferSize, FromSample, SampleFormat, SampleRate, SizedSample};
-use distrodaw_engine::Sine;
+use distrodaw_engine::SineBank;
 use stats::AudioStats;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -31,6 +31,10 @@ struct Args {
     /// Frecuencia de muestreo en Hz (por defecto, la del dispositivo).
     #[arg(long)]
     rate: Option<u32>,
+
+    /// Número de sinusoides simultáneas (prueba de polifonía).
+    #[arg(long, default_value_t = 1)]
+    voices: usize,
 
     /// Duración de la prueba en segundos.
     #[arg(long, default_value_t = 3)]
@@ -62,14 +66,14 @@ fn main() -> Result<()> {
 
     let stats = Arc::new(AudioStats::default());
     let stream = match sample_format {
-        SampleFormat::F32 => build::<f32>(&device, &config, &stats)?,
-        SampleFormat::I16 => build::<i16>(&device, &config, &stats)?,
-        SampleFormat::U16 => build::<u16>(&device, &config, &stats)?,
+        SampleFormat::F32 => build::<f32>(&device, &config, &stats, args.voices)?,
+        SampleFormat::I16 => build::<i16>(&device, &config, &stats, args.voices)?,
+        SampleFormat::U16 => build::<u16>(&device, &config, &stats, args.voices)?,
         other => return Err(anyhow!("formato de muestra no soportado: {other:?}")),
     };
 
     stream.play()?;
-    println!("Sonando 440 Hz durante {} s...", args.seconds);
+    println!("Sonando {} voz/voces durante {} s...", args.voices, args.seconds);
     let rate = config.sample_rate.0;
     for _ in 0..args.seconds {
         std::thread::sleep(Duration::from_secs(1));
@@ -126,13 +130,14 @@ fn build<T>(
     device: &cpal::Device,
     config: &cpal::StreamConfig,
     stats: &Arc<AudioStats>,
+    voices: usize,
 ) -> Result<cpal::Stream>
 where
     T: SizedSample + FromSample<f32>,
 {
     let rate = config.sample_rate.0;
     let channels = config.channels as usize;
-    let mut osc = Sine::new(rate as f32, 440.0);
+    let mut osc = SineBank::new(rate as f32, voices, 440.0);
     let cb_stats = Arc::clone(stats);
     let err_stats = Arc::clone(stats);
 
