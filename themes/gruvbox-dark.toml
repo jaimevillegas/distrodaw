@@ -1,0 +1,12 @@
+name = "Gruvbox Dark"
+
+[colors]
+background = "#282828"
+foreground = "#ebdbb2"
+title      = "#83a598"
+label      = "#928374"
+value      = "#b8bb26"
+accent     = "#fabd2f"
+ok         = "#b8bb26"
+warn       = "#fe8019"
+alert      = "#fb4934"
