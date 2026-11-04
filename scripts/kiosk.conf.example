@@ -8,10 +8,13 @@ THEME=dracula
 FONT="JetBrains Mono"
 FONT_SIZE=13
 
-# Argumentos de audio, ANTES del subcomando (ver `distrodaw devices`)
+# Argumentos de audio, ANTES del subcomando (ver `distrodaw devices`).
+# `plughw:` funciona tanto si el Volt 2 va a 480M como si cae a 12M (USB 1.1)
 AUDIO_ARGS="--device plughw:CARD=V2,DEV=0 --rate 48000 --buffer 128"
 
-# Argumentos de la interfaz (ver `distrodaw tui --help`)
+# Argumentos de la interfaz (ver `distrodaw tui --help`). Pon aquí el nombre de tu
+# teclado MIDI tal como sale en `distrodaw midi-ports` (sin --midi se usa el primer puerto
+# que no sea «Midi Through», que puede ser el propio Volt 2).
 TUI_ARGS="--midi Keystation --patch patches/organ.toml"
 
 # Si cage falla al arrancar con el renderizador de GPU, descomenta esta línea

@@ -24,8 +24,21 @@ Se descartaron `kmscon` (más ligero pero con menos soporte y pruebas) y `fbterm
    cat /sys/class/drm/card0-HDMI-A-1/modes | head -3    # el primero debe ser 1920x1080
    ```
 
-   Si no, vuelve a conectar el cable HDMI, o fuerza el modo (una sola línea en
-   `/boot/firmware/cmdline.txt`, añadiendo al final ` video=HDMI-A-1:1920x1080@60`).
+   Si no, lo normal es que baste con **reiniciar con el monitor ya encendido y conectado**
+   (o volver a conectar el cable HDMI). Solo si sigue fallando, fuerza el modo con
+   ` video=HDMI-A-1:1920x1080@60` al final de la línea de `/boot/firmware/cmdline.txt`.
+
+   > **Cuidado con `cmdline.txt`:** va en la partición de arranque (FAT), que es frágil ante
+   > cortes de corriente. Si queda vacío, la Pi puede no arrancar. Haz siempre copia y
+   > comprueba el resultado antes de reiniciar:
+   >
+   > ```sh
+   > sudo cp /boot/firmware/cmdline.txt /boot/firmware/cmdline.txt.bak
+   > # ...editar...
+   > sync && wc -c /boot/firmware/cmdline.txt     # debe tener unos 170 bytes, no 0
+   > ```
+   >
+   > Apaga siempre con `sudo shutdown -h now` o `sudo reboot`; no quites la alimentación sin más.
 2. **Alimentación.** Un hub USB con alimentación propia para el Volt 2 y los teclados
    (ver `docs/AUDIO.md`). El compositor añade algo de carga a la Pi.
 
