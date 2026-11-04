@@ -42,10 +42,12 @@ pub fn draw(frame: &mut Frame, state: &UiState) {
 }
 
 fn draw_play(frame: &mut Frame, area: Rect, state: &UiState) {
+    let title = " DISTRODAW · Play ";
     let block = with_status(
-        Block::bordered().title(Span::styled(" DISTRODAW · Play ", title_style())),
+        Block::bordered().title(Span::styled(title, title_style())),
         state,
         area.width,
+        title,
     );
     let notes = if state.recent_notes.is_empty() {
         "-".to_string()
@@ -77,10 +79,12 @@ fn row<'a>(label: &str, value: &str) -> Line<'a> {
 }
 
 fn draw_synth(frame: &mut Frame, area: Rect, state: &UiState) {
+    let title = format!(" SYNTH: {} ", state.patch);
     let block = with_status(
-        Block::bordered().title(Span::styled(format!(" SYNTH: {} ", state.patch), title_style())),
+        Block::bordered().title(Span::styled(title.clone(), title_style())),
         state,
         area.width,
+        &title,
     );
     let wave = waveform_name(state.params[ParamId::Waveform as usize]);
     let mut lines = vec![
@@ -120,11 +124,11 @@ fn draw_synth(frame: &mut Frame, area: Rect, state: &UiState) {
 }
 
 /// Añade el mensaje de estado, si hay, alineado a la derecha del borde superior.
-fn with_status<'a>(block: Block<'a>, state: &UiState, width: u16) -> Block<'a> {
+fn with_status<'a>(block: Block<'a>, state: &UiState, width: u16, title: &str) -> Block<'a> {
     let Some(status) = &state.status else { return block };
     let color = if status.error { Color::Red } else { Color::Green };
-    // Deja sitio al título de la izquierda y a los bordes.
-    let max = usize::from(width).saturating_sub(34).max(10);
+    // Deja sitio al título de la izquierda, a los bordes y a los espacios del mensaje.
+    let max = usize::from(width).saturating_sub(title.chars().count() + 6).max(10);
     let text = clip(&status.text, max);
     block.title(Line::from(Span::styled(format!(" {text} "), Style::new().fg(color))).right_aligned())
 }
@@ -138,10 +142,12 @@ fn clip(text: &str, max: usize) -> String {
 }
 
 fn draw_files(frame: &mut Frame, area: Rect, state: &UiState) {
+    let title = " DISTRODAW · Files ";
     let block = with_status(
-        Block::bordered().title(Span::styled(" DISTRODAW · Files ", title_style())),
+        Block::bordered().title(Span::styled(title, title_style())),
         state,
         area.width,
+        title,
     );
     let mut lines = vec![
         row("Carpeta", if state.patch_dir.is_empty() { "-" } else { &state.patch_dir }),
@@ -316,6 +322,14 @@ mod tests {
         let out = render(&s, 80, 16);
         assert!(contains(&out, "▶   p39.toml"));
         assert!(!contains(&out, "p00.toml"));
+    }
+
+    #[test]
+    fn a_typical_reload_error_fits_whole_in_an_80_column_terminal() {
+        let mut s = UiState::default();
+        s.set_status("live.toml: envelope.sustain = 9 fuera de rango (0 a 1)", true);
+        let out = render(&s, 80, 20);
+        assert!(contains(&out, "envelope.sustain = 9 fuera de rango (0 a 1)"), "{out:#?}");
     }
 
     #[test]

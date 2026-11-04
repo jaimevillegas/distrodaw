@@ -88,7 +88,8 @@ pub fn run(audio_args: &AudioArgs, args: &TuiArgs) -> Result<()> {
             let path = watcher.as_ref().map(|w| w.path().to_path_buf()).unwrap_or_default();
             match result {
                 Ok(patch) => show_loaded(&mut state, &mut session, &path, &patch, "Recargado"),
-                Err(e) => state.set_status(format!("Recarga fallida, se mantiene el sonido · {e}"), true),
+                // El sonido anterior se mantiene; el mensaje va en rojo y empieza por el archivo.
+                Err(e) => state.set_status(e, true),
             }
         }
 
