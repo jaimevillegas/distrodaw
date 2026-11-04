@@ -44,8 +44,7 @@ pub fn to_event(msg: Midi) -> Option<EventKind> {
 
 /// Mapa fijo de controladores MIDI a parámetros (estándar «sound controllers»
 /// siempre que existe uno): 7 volumen, 70 forma de onda, 72 release, 73 attack,
-/// 75 decay, 79 sustain. Los tiempos usan una curva cuadrática para tener más
-/// resolución en valores cortos.
+/// 75 decay, 79 sustain. El reparto del rango lo define `ParamKind`.
 pub fn cc_to_param(controller: u8, value: u8) -> Option<(ParamId, f32)> {
     let id = match controller {
         7 => ParamId::Volume,
@@ -57,12 +56,7 @@ pub fn cc_to_param(controller: u8, value: u8) -> Option<(ParamId, f32)> {
         _ => return None,
     };
     let norm = f32::from(value.min(127)) / 127.0;
-    let spec = id.spec();
-    let curved = match id {
-        ParamId::Attack | ParamId::Decay | ParamId::Release => norm * norm,
-        _ => norm,
-    };
-    Some((id, spec.min + curved * (spec.max - spec.min)))
+    Some((id, id.spec().from_normalized(norm)))
 }
 
 /// Elige el puerto cuyo nombre contiene `filter`; sin filtro, el primero que
