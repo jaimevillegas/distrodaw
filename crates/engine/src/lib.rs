@@ -6,6 +6,8 @@
 
 pub mod bank;
 pub mod osc;
+pub mod params;
 
 pub use bank::SineBank;
 pub use osc::Sine;
+pub use params::{ParamId, ParamSpec, Params, PARAM_COUNT, SPECS};
