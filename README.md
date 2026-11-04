@@ -22,6 +22,10 @@ Hito 4 implementado: sintes como patches en TOML (`patches/`), con recarga en ca
 pantalla Files (F5) para cargar y guardar. Pendiente de probar a oído. Ver
 [docs/HITO4.md](docs/HITO4.md).
 
+Color de 24 bits y temas (`--theme dracula`, `solarized-dark`, `gruvbox-dark`, `nord`) y un kiosco
+cage + foot para la Pi, aún sin probar en la Pi. Ver [docs/KIOSK.md](docs/KIOSK.md). El audio se
+reabre solo si el dispositivo se desconecta: [docs/AUDIO.md](docs/AUDIO.md).
+
 ## Estructura
 
 | Crate | Función |
@@ -42,6 +46,7 @@ cargo run --release -p distrodaw -- midi-ports
 cargo run --release -p distrodaw -- play --monitor
 cargo run --release -p distrodaw            # interfaz de terminal
 cargo run --release -p distrodaw -- tui --patch patches/pad.toml   # con un patch que se recarga al guardar
+cargo run --release -p distrodaw -- tui --theme dracula --color truecolor   # color de 24 bits
 cargo run --release -p distrodaw -- bench --buffer 128 --rate 48000 --voices 16 --seconds 5
 ```
 
