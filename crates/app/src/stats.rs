@@ -1,7 +1,7 @@
 //! Métricas del callback de audio. Todo son atómicos: el hilo de audio solo
 //! escribe y el hilo principal lee, sin locks ni reservas de memoria.
 
-use std::sync::atomic::{AtomicU64, Ordering::Relaxed};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering::Relaxed};
 use std::time::Duration;
 
 #[derive(Default)]
@@ -19,7 +19,12 @@ pub struct AudioStats {
     peak_ns: AtomicU64,
     /// Callbacks que tardaron más que lo que dura su buffer.
     misses: AtomicU64,
+    /// Subdesbordamientos que notifica el controlador de audio.
+    xruns: AtomicU64,
+    /// Otros errores del stream.
     stream_errors: AtomicU64,
+    /// El dispositivo de audio desapareció (p. ej. se desconectó el USB).
+    device_lost: AtomicBool,
 }
 
 pub struct Report {
@@ -37,6 +42,7 @@ pub struct Report {
     /// duración del buffer del dispositivo, hubo corte seguro.
     pub peak_ms: f64,
     pub misses: u64,
+    pub xruns: u64,
     pub stream_errors: u64,
 }
 
@@ -61,6 +67,19 @@ impl AudioStats {
         self.stream_errors.fetch_add(1, Relaxed);
     }
 
+    pub fn record_xrun(&self) {
+        self.xruns.fetch_add(1, Relaxed);
+    }
+
+    pub fn mark_device_lost(&self) {
+        self.device_lost.store(true, Relaxed);
+    }
+
+    /// `true` una sola vez por cada pérdida del dispositivo.
+    pub fn take_device_lost(&self) -> bool {
+        self.device_lost.swap(false, Relaxed)
+    }
+
     /// Instantánea de las métricas; reinicia el máximo del intervalo.
     pub fn take_report(&self, sample_rate: u32) -> Report {
         let frames = self.last_frames.load(Relaxed).max(1);
@@ -80,6 +99,7 @@ impl AudioStats {
             peak_load: self.peak_ns.load(Relaxed) as f64 / buffer_ns,
             peak_ms: self.peak_ns.load(Relaxed) as f64 / 1e6,
             misses: self.misses.load(Relaxed),
+            xruns: self.xruns.load(Relaxed),
             stream_errors: self.stream_errors.load(Relaxed),
         }
     }
@@ -114,5 +134,25 @@ mod tests {
         let r = stats.take_report(SR);
         assert_eq!(r.misses, 1);
         assert_eq!(r.callbacks, 2);
+    }
+
+    #[test]
+    fn device_loss_is_reported_once() {
+        let stats = AudioStats::default();
+        assert!(!stats.take_device_lost());
+        stats.mark_device_lost();
+        stats.mark_device_lost();
+        assert!(stats.take_device_lost());
+        assert!(!stats.take_device_lost());
+    }
+
+    #[test]
+    fn xruns_and_other_errors_are_counted_apart() {
+        let stats = AudioStats::default();
+        stats.record_xrun();
+        stats.record_xrun();
+        stats.record_stream_error();
+        let r = stats.take_report(SR);
+        assert_eq!((r.xruns, r.stream_errors), (2, 1));
     }
 }

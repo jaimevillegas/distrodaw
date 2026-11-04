@@ -37,7 +37,7 @@ pub fn run(audio_args: &AudioArgs, args: &PlayArgs) -> Result<()> {
     println!("MIDI: {}", session.midi_port.as_deref().unwrap_or("-"));
     println!("Toca el teclado. Ctrl+C para salir.");
 
-    let rate = session.output.sample_rate;
+    let rate = session.output.info.sample_rate;
     let started = std::time::Instant::now();
     loop {
         std::thread::sleep(Duration::from_millis(500));

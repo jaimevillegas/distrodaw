@@ -43,12 +43,12 @@ impl Default for TuiArgs {
 pub fn run(audio_args: &AudioArgs, args: &TuiArgs) -> Result<()> {
     // Sin `--midi` la interfaz arranca aunque no haya teclado conectado.
     let mut session = session::start(audio_args, args.midi.as_deref(), args.midi.is_some(), Mode::Tui)?;
-    let rate = session.output.sample_rate;
+    let rate = session.output.info.sample_rate;
 
     let mut state = UiState::default();
     state.midi_port = session.midi_port.clone().unwrap_or_else(|| "(sin teclado MIDI)".into());
-    let buffer = session.output.device_buffer.map_or("auto".to_string(), |b| b.to_string());
-    state.audio_info = format!("{} · {rate} Hz · buffer {buffer}", session.output.device_name);
+    let buffer = session.output.info.device_buffer.map_or("auto".to_string(), |b| b.to_string());
+    state.audio_info = format!("{} · {rate} Hz · buffer {buffer}", session.output.info.device_name);
     state.patch_dir = args.patch_dir.display().to_string();
     state.set_files(patches::file_names(&args.patch_dir));
 
@@ -76,7 +76,7 @@ pub fn run(audio_args: &AudioArgs, args: &TuiArgs) -> Result<()> {
         let report = session.stats.take_report(rate);
         state.cpu_load = report.interval_avg_load as f32;
         state.misses = report.misses;
-        state.errors = report.stream_errors;
+        state.errors = report.stream_errors + report.xruns;
         state.tick();
 
         if last_refresh.elapsed() >= REFRESH_FILES {
