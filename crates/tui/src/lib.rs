@@ -7,7 +7,9 @@
 pub mod format;
 pub mod input;
 pub mod state;
+pub mod terminal;
 pub mod ui;
 
+pub use terminal::{next_action, Tui};
 pub use ui::draw;
 pub use state::{Action, Edit, Screen, Step, UiState};
