@@ -11,7 +11,12 @@ cd "$(dirname "$0")/.."
 cross build --release --target "$target" -p distrodaw
 
 ssh "$host" "mkdir -p '$dest'"
-scp "target/$target/release/distrodaw" scripts/bench-pi.sh "$host:$dest/"
+# El binario se copia con otro nombre y se renombra: reemplazar un ejecutable en uso con scp
+# falla («text file busy»), pero renombrarlo sobre él sí funciona (el proceso en marcha sigue
+# con la versión vieja hasta que se reinicie).
+scp "target/$target/release/distrodaw" "$host:$dest/distrodaw.new"
+scp scripts/bench-pi.sh "$host:$dest/"
+ssh "$host" "cd '$dest' && chmod +x distrodaw.new && mv -f distrodaw.new distrodaw"
 scp -r patches themes "$host:$dest/"
 scp scripts/pi-kiosk.sh scripts/kiosk-session.sh scripts/kiosk.conf.example "$host:$dest/"
 # Fuerza el volcado a la SD y comprueba que lo escrito es idéntico a lo enviado. Sin esto, si la
