@@ -223,6 +223,7 @@ impl Session {
         });
         match result {
             Ok(output) => {
+                self.stats.reset_gap();
                 self.info = output.info.clone();
                 self.output = Some(output);
                 Ok(())

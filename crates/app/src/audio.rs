@@ -170,7 +170,7 @@ where
                 }
                 done += n;
             }
-            cb_stats.record(frames, start.elapsed(), rate);
+            cb_stats.record(frames, start, start.elapsed(), rate);
         },
         move |err: cpal::Error| {
             match err.kind() {
