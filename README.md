@@ -7,8 +7,9 @@ cópialo, modifícalo y úsalo para lo que quieras.
 
 ## Estado
 
-Hito 1 en curso: banco de pruebas de audio (`distrodaw --help`) para medir carga de CPU y
-plazos perdidos en la Pi 2. Ver [docs/HITO1.md](docs/HITO1.md).
+Hito 1 completado: banco de pruebas de audio (`distrodaw --help`) y mediciones en la
+Pi 2 con el Volt 2 (buffers de 64 a 256 frames, hasta 64 sinusoides sin cortes).
+Ver [docs/HITO1.md](docs/HITO1.md).
 
 ## Estructura
 
@@ -52,7 +53,7 @@ está en `Cross.toml`.
 ## Hitos
 
 - [x] 0. Oscilador sonando en PC
-- [ ] 1. Compilar a Pi 2 y medir latencia/CPU con el Volt 2
+- [x] 1. Compilar a Pi 2 y medir latencia/CPU con el Volt 2
 - [ ] 2. Teclado MIDI → sinte de 8 voces con ADSR
 - [ ] 3. TUI (Play, Synth, Seq, Files)
 - [ ] 4. Patches desde archivo (TOML)
