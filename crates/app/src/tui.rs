@@ -7,7 +7,7 @@ use crate::session::{self, AudioEvent, Mode, Session};
 use anyhow::Result;
 use clap::Args;
 use distrodaw_engine::Patch;
-use distrodaw_tui::{next_action, FileRequest, Tui, UiState};
+use distrodaw_tui::{next_action, FileRequest, Palette, Tui, UiState};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
@@ -60,7 +60,7 @@ pub fn run(audio_args: &AudioArgs, args: &TuiArgs) -> Result<()> {
         }
     }
 
-    let mut tui = Tui::enter()?;
+    let mut tui = Tui::enter(Palette::basic())?;
     let mut last_refresh = Instant::now();
     while !state.quit {
         while let Ok(msg) = session.midi_rx.pop() {

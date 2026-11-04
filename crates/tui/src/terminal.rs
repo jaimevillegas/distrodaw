@@ -2,6 +2,7 @@
 
 use crate::input::action_for_key;
 use crate::state::Action;
+use crate::theme::Palette;
 use ratatui::crossterm::event::{self, Event};
 use ratatui::DefaultTerminal;
 use std::io;
@@ -11,15 +12,17 @@ use std::time::Duration;
 /// pánico) deja la terminal como estaba.
 pub struct Tui {
     terminal: DefaultTerminal,
+    palette: Palette,
 }
 
 impl Tui {
-    pub fn enter() -> io::Result<Self> {
-        Ok(Self { terminal: ratatui::try_init()? })
+    pub fn enter(palette: Palette) -> io::Result<Self> {
+        Ok(Self { terminal: ratatui::try_init()?, palette })
     }
 
     pub fn draw(&mut self, state: &crate::state::UiState) -> io::Result<()> {
-        self.terminal.draw(|frame| crate::ui::draw(frame, state)).map(|_| ())
+        let palette = &self.palette;
+        self.terminal.draw(|frame| crate::ui::draw(frame, state, palette)).map(|_| ())
     }
 }
 

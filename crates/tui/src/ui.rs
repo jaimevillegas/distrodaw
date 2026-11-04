@@ -1,11 +1,13 @@
-//! Dibujo de las pantallas. Solo se usan los 16 colores básicos para que se
-//! vea igual en la consola del kernel y por SSH.
+//! Dibujo de las pantallas. Todos los colores salen de una [`Palette`]: con
+//! `Palette::basic()` solo se usan los 16 colores básicos (se ve igual en la
+//! consola del kernel y por SSH) y con un tema, colores RGB de 24 bits.
 
 use crate::format::{bar, note_name, param_value, waveform_name};
 use crate::state::{Screen, UiState};
+use crate::theme::Palette;
 use distrodaw_engine::{ParamId, ParamKind, SPECS};
 use ratatui::layout::{Constraint, Layout, Rect};
-use ratatui::style::{Color, Modifier, Style};
+use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Paragraph};
 use ratatui::Frame;
@@ -16,38 +18,38 @@ const METER_WIDTH: usize = 16;
 const BAR_WIDTH: usize = 20;
 const VOICES: usize = distrodaw_engine::VOICES;
 
-fn title_style() -> Style {
-    Style::new().fg(Color::Cyan).add_modifier(Modifier::BOLD)
+/// Bloque con borde y el estilo base de la paleta.
+fn bordered<'a>(p: &Palette) -> Block<'a> {
+    Block::bordered().style(p.base()).border_style(p.border_style())
 }
 
-fn label_style() -> Style {
-    Style::new().fg(Color::DarkGray)
-}
-
-pub fn draw(frame: &mut Frame, state: &UiState) {
+pub fn draw(frame: &mut Frame, state: &UiState, p: &Palette) {
     let area = frame.area();
+    // Pinta todo el fondo con el color del tema (no hace nada con la paleta básica).
+    frame.render_widget(Block::new().style(p.base()), area);
     if area.width < MIN_WIDTH || area.height < MIN_HEIGHT {
         let msg = format!("Terminal demasiado pequeña (mínimo {MIN_WIDTH}x{MIN_HEIGHT})");
-        frame.render_widget(Paragraph::new(msg), area);
+        frame.render_widget(Paragraph::new(msg).style(p.base()), area);
         return;
     }
     let [body, footer] =
         Layout::vertical([Constraint::Min(0), Constraint::Length(3)]).areas(area);
     match state.screen {
-        Screen::Play => draw_play(frame, body, state),
-        Screen::Synth => draw_synth(frame, body, state),
-        Screen::Files => draw_files(frame, body, state),
+        Screen::Play => draw_play(frame, body, state, p),
+        Screen::Synth => draw_synth(frame, body, state, p),
+        Screen::Files => draw_files(frame, body, state, p),
     }
-    draw_footer(frame, footer, state);
+    draw_footer(frame, footer, state, p);
 }
 
-fn draw_play(frame: &mut Frame, area: Rect, state: &UiState) {
+fn draw_play(frame: &mut Frame, area: Rect, state: &UiState, p: &Palette) {
     let title = " DISTRODAW · Play ";
     let block = with_status(
-        Block::bordered().title(Span::styled(title, title_style())),
+        bordered(p).title(Span::styled(title, p.title_style())),
         state,
         area.width,
         title,
+        p,
     );
     let notes = if state.recent_notes.is_empty() {
         "-".to_string()
@@ -57,44 +59,45 @@ fn draw_play(frame: &mut Frame, area: Rect, state: &UiState) {
     let active = state.voices.min(VOICES);
     let slots = format!("{}{}", "■".repeat(active), "□".repeat(VOICES - active));
     let lines = vec![
-        row("Patch", &state.patch),
-        row("MIDI", if state.midi_port.is_empty() { "-" } else { &state.midi_port }),
-        row("Audio", if state.audio_info.is_empty() { "-" } else { &state.audio_info }),
+        row("Patch", &state.patch, p),
+        row("MIDI", if state.midi_port.is_empty() { "-" } else { &state.midi_port }, p),
+        row("Audio", if state.audio_info.is_empty() { "-" } else { &state.audio_info }, p),
         Line::raw(""),
         Line::from(vec![
-            Span::styled(format!("{:<8}", "Voces"), label_style()),
-            Span::styled(slots, Style::new().fg(Color::Green)),
+            Span::styled(format!("{:<8}", "Voces"), p.label_style()),
+            Span::styled(slots, p.value_style()),
             Span::raw(format!("  {active}/{VOICES}")),
         ]),
-        row("Notas", &notes),
+        row("Notas", &notes, p),
     ];
     frame.render_widget(Paragraph::new(lines).block(block), area);
 }
 
-fn row<'a>(label: &str, value: &str) -> Line<'a> {
+fn row<'a>(label: &str, value: &str, p: &Palette) -> Line<'a> {
     Line::from(vec![
-        Span::styled(format!("{label:<8}"), label_style()),
+        Span::styled(format!("{label:<8}"), p.label_style()),
         Span::raw(value.to_string()),
     ])
 }
 
-fn draw_synth(frame: &mut Frame, area: Rect, state: &UiState) {
+fn draw_synth(frame: &mut Frame, area: Rect, state: &UiState, p: &Palette) {
     let title = format!(" SYNTH: {} ", state.patch);
     let block = with_status(
-        Block::bordered().title(Span::styled(title.clone(), title_style())),
+        bordered(p).title(Span::styled(title.clone(), p.title_style())),
         state,
         area.width,
         &title,
+        p,
     );
     let wave = waveform_name(state.params[ParamId::Waveform as usize]);
     let mut lines = vec![
         Line::from(vec![
-            Span::styled("OSC ", label_style()),
-            Span::styled(wave, Style::new().fg(Color::Yellow)),
-            Span::styled(" ─▶ ", label_style()),
-            Span::styled("AMP adsr", Style::new().fg(Color::Yellow)),
-            Span::styled(" ─▶ ", label_style()),
-            Span::styled("OUT", Style::new().fg(Color::Yellow)),
+            Span::styled("OSC ", p.label_style()),
+            Span::styled(wave, p.accent_style()),
+            Span::styled(" ─▶ ", p.label_style()),
+            Span::styled("AMP adsr", p.accent_style()),
+            Span::styled(" ─▶ ", p.label_style()),
+            Span::styled("OUT", p.accent_style()),
         ]),
         Line::raw(""),
     ];
@@ -116,7 +119,7 @@ fn draw_synth(frame: &mut Frame, area: Rect, state: &UiState) {
         let style = if selected {
             Style::new().add_modifier(Modifier::REVERSED)
         } else {
-            Style::new().fg(Color::Green)
+            p.value_style()
         };
         lines.push(Line::from(Span::styled(text, style)));
     }
@@ -124,9 +127,15 @@ fn draw_synth(frame: &mut Frame, area: Rect, state: &UiState) {
 }
 
 /// Añade el mensaje de estado, si hay, alineado a la derecha del borde superior.
-fn with_status<'a>(block: Block<'a>, state: &UiState, width: u16, title: &str) -> Block<'a> {
+fn with_status<'a>(
+    block: Block<'a>,
+    state: &UiState,
+    width: u16,
+    title: &str,
+    p: &Palette,
+) -> Block<'a> {
     let Some(status) = &state.status else { return block };
-    let color = if status.error { Color::Red } else { Color::Green };
+    let color = if status.error { p.alert } else { p.ok };
     // Deja sitio al título de la izquierda, a los bordes y a los espacios del mensaje.
     let max = usize::from(width).saturating_sub(title.chars().count() + 6).max(10);
     let text = clip(&status.text, max);
@@ -141,20 +150,21 @@ fn clip(text: &str, max: usize) -> String {
     format!("{kept}…")
 }
 
-fn draw_files(frame: &mut Frame, area: Rect, state: &UiState) {
+fn draw_files(frame: &mut Frame, area: Rect, state: &UiState, p: &Palette) {
     let title = " DISTRODAW · Files ";
     let block = with_status(
-        Block::bordered().title(Span::styled(title, title_style())),
+        bordered(p).title(Span::styled(title, p.title_style())),
         state,
         area.width,
         title,
+        p,
     );
     let mut lines = vec![
-        row("Carpeta", if state.patch_dir.is_empty() { "-" } else { &state.patch_dir }),
+        row("Carpeta", if state.patch_dir.is_empty() { "-" } else { &state.patch_dir }, p),
         Line::raw(""),
     ];
     if state.files.is_empty() {
-        lines.push(Line::styled("No hay patches (.toml). Pulsa n para guardar el actual.", label_style()));
+        lines.push(Line::styled("No hay patches (.toml). Pulsa n para guardar el actual.", p.label_style()));
     } else {
         // Ventana de filas que mantiene visible el cursor.
         let visible = usize::from(area.height).saturating_sub(2 + lines.len()).max(1);
@@ -165,7 +175,7 @@ fn draw_files(frame: &mut Frame, area: Rect, state: &UiState) {
             let style = if i == state.file_cursor {
                 Style::new().add_modifier(Modifier::REVERSED)
             } else {
-                Style::new().fg(Color::Green)
+                p.value_style()
             };
             lines.push(Line::from(Span::styled(format!("{marker} {loaded} {name}"), style)));
         }
@@ -173,47 +183,57 @@ fn draw_files(frame: &mut Frame, area: Rect, state: &UiState) {
     frame.render_widget(Paragraph::new(lines).block(block), area);
 }
 
-fn draw_footer(frame: &mut Frame, area: Rect, state: &UiState) {
+fn draw_footer(frame: &mut Frame, area: Rect, state: &UiState, p: &Palette) {
     let hints = match state.screen {
         Screen::Play => " F1 Play  F2 Synth  F5 Files  q salir ",
         Screen::Synth => " F1 Play  F2 Synth  F5 Files  ↑↓ elegir  ←→ ajustar  ,. fino  q salir ",
         Screen::Files => " F1 Play  F2 Synth  F5 Files  ↑↓ elegir  Enter cargar  s guardar  n nuevo ",
     };
-    let block = Block::bordered().title_bottom(Span::styled(hints, label_style()));
+    let block = bordered(p).title_bottom(Span::styled(hints, p.label_style()));
 
-    let level_color = if state.peak >= 0.9 {
-        Color::Red
-    } else if state.peak >= 0.7 {
-        Color::Yellow
-    } else {
-        Color::Green
-    };
-    let cpu_color = if state.cpu_load >= 0.8 || state.misses > 0 { Color::Red } else { Color::Green };
     if state.audio_lost {
         let alert = Line::from(vec![
-            Span::styled(
-                "AUDIO PERDIDO",
-                Style::new().fg(Color::Red).add_modifier(Modifier::BOLD),
-            ),
-            Span::styled(" · se reintenta solo · las notas no suenan", label_style()),
+            Span::styled("AUDIO PERDIDO", Style::new().fg(p.alert).add_modifier(Modifier::BOLD)),
+            Span::styled(" · se reintenta solo · las notas no suenan", p.label_style()),
         ]);
         frame.render_widget(Paragraph::new(alert).block(block), area);
         return;
     }
-    let line = Line::from(vec![
-        Span::styled("OUT ", label_style()),
-        Span::styled(bar(state.peak, METER_WIDTH), Style::new().fg(level_color)),
-        Span::styled("  voces ", label_style()),
+    let cpu_color = if state.cpu_load >= 0.8 || state.misses > 0 { p.alert } else { p.ok };
+    let xruns = state.misses + state.errors;
+    let mut spans = vec![Span::styled("OUT ", p.label_style())];
+    spans.extend(meter(state.peak, p));
+    spans.extend([
+        Span::styled("  voces ", p.label_style()),
         Span::raw(format!("{}/{VOICES}", state.voices.min(VOICES))),
-        Span::styled("  cpu ", label_style()),
+        Span::styled("  cpu ", p.label_style()),
         Span::styled(format!("{:.0}%", state.cpu_load * 100.0), Style::new().fg(cpu_color)),
-        Span::styled("  xruns ", label_style()),
-        Span::styled(
-            (state.misses + state.errors).to_string(),
-            Style::new().fg(if state.misses + state.errors > 0 { Color::Red } else { Color::Green }),
-        ),
+        Span::styled("  xruns ", p.label_style()),
+        Span::styled(xruns.to_string(), Style::new().fg(if xruns > 0 { p.alert } else { p.ok })),
     ]);
-    frame.render_widget(Paragraph::new(line).block(block), area);
+    frame.render_widget(Paragraph::new(Line::from(spans)).block(block), area);
+}
+
+/// Medidor de nivel: cada casilla lleva el color de su posición (verde,
+/// ámbar a partir del 70 % y rojo a partir del 90 %), como un medidor de verdad.
+fn meter<'a>(level: f32, p: &Palette) -> Vec<Span<'a>> {
+    let filled = (level.clamp(0.0, 1.0) * METER_WIDTH as f32).round() as usize;
+    (0..METER_WIDTH)
+        .map(|i| {
+            if i >= filled {
+                return Span::styled("░", p.label_style());
+            }
+            let position = (i + 1) as f32 / METER_WIDTH as f32;
+            let color = if position > 0.9 {
+                p.alert
+            } else if position > 0.7 {
+                p.warn
+            } else {
+                p.ok
+            };
+            Span::styled("▓", Style::new().fg(color))
+        })
+        .collect()
 }
 
 #[cfg(test)]
@@ -225,7 +245,7 @@ mod tests {
 
     fn render(state: &UiState, width: u16, height: u16) -> Vec<String> {
         let mut terminal = Terminal::new(TestBackend::new(width, height)).unwrap();
-        terminal.draw(|f| draw(f, state)).unwrap();
+        terminal.draw(|f| draw(f, state, &Palette::basic())).unwrap();
         let buffer = terminal.backend().buffer().clone();
         (0..height)
             .map(|y| (0..width).map(|x| buffer[(x, y)].symbol().to_string()).collect::<String>())
@@ -366,5 +386,83 @@ mod tests {
         assert!(!contains(&out, "OUT ▓"), "no se enseña un medidor que ya no se mueve");
         s.audio_lost = false;
         assert!(contains(&render(&s, 80, 20), "OUT "));
+    }
+
+    use crate::theme::Theme;
+    use ratatui::buffer::Buffer;
+    use ratatui::style::Color;
+
+    fn render_buffer(state: &UiState, palette: &Palette, width: u16, height: u16) -> Buffer {
+        let mut terminal = Terminal::new(TestBackend::new(width, height)).unwrap();
+        terminal.draw(|f| draw(f, state, palette)).unwrap();
+        terminal.backend().buffer().clone()
+    }
+
+    fn dracula() -> Palette {
+        Palette::from_theme(&Theme::default())
+    }
+
+    #[test]
+    fn a_theme_paints_the_whole_screen_background_in_rgb() {
+        let buffer = render_buffer(&UiState::default(), &dracula(), 80, 25);
+        let bg = Color::Rgb(0x28, 0x2a, 0x36);
+        for (x, y) in [(0, 0), (79, 24), (40, 12), (79, 0), (0, 24)] {
+            assert_eq!(buffer[(x, y)].bg, bg, "celda {x},{y}");
+        }
+        // Una celda con texto usa el color de texto del tema.
+        let patch_row = (0..25).find(|&y| (0..80).map(|x| buffer[(x, y)].symbol()).collect::<String>().contains("Patch")).unwrap();
+        let value = (0..80).map(|x| buffer[(x, patch_row)].symbol().to_string()).collect::<String>();
+        let x_init = value.find("Init").unwrap() as u16;
+        assert_eq!(buffer[(x_init, patch_row)].fg, Color::Rgb(0xf8, 0xf8, 0xf2));
+    }
+
+    #[test]
+    fn borders_and_titles_take_their_theme_colors() {
+        let buffer = render_buffer(&UiState::default(), &dracula(), 80, 25);
+        assert_eq!(buffer[(0, 0)].fg, Color::Rgb(0x62, 0x72, 0xa4), "borde = label");
+        let title_x = (0..80).find(|&x| buffer[(x, 0)].symbol() == "D").unwrap();
+        assert_eq!(buffer[(title_x, 0)].fg, Color::Rgb(0xbd, 0x93, 0xf9), "título");
+    }
+
+    #[test]
+    fn the_basic_palette_never_sets_a_background_or_rgb_colors() {
+        let buffer = render_buffer(&UiState::default(), &Palette::basic(), 80, 25);
+        for y in 0..25 {
+            for x in 0..80 {
+                let cell = &buffer[(x, y)];
+                assert_eq!(cell.bg, Color::Reset, "celda {x},{y}");
+                assert!(!matches!(cell.fg, Color::Rgb(..)), "celda {x},{y}");
+            }
+        }
+    }
+
+    #[test]
+    fn the_level_meter_changes_color_along_its_length() {
+        let mut s = UiState::default();
+        s.peak = 1.0;
+        let p = dracula();
+        let buffer = render_buffer(&s, &p, 80, 25);
+        let row = 25 - 2;
+        let cells: Vec<Color> = (0..80)
+            .filter(|&x| buffer[(x, row)].symbol() == "▓")
+            .map(|x| buffer[(x, row)].fg)
+            .collect();
+        assert_eq!(cells.len(), METER_WIDTH);
+        assert_eq!(cells[0], p.ok);
+        assert_eq!(cells[METER_WIDTH - 1], p.alert);
+        assert!(cells.contains(&p.warn), "debe haber tramo ámbar");
+    }
+
+    #[test]
+    fn a_quiet_meter_stays_green_and_the_empty_part_is_dim() {
+        let mut s = UiState::default();
+        s.peak = 0.25;
+        let p = dracula();
+        let buffer = render_buffer(&s, &p, 80, 25);
+        let row = 25 - 2;
+        let filled: Vec<Color> = (0..80).filter(|&x| buffer[(x, row)].symbol() == "▓").map(|x| buffer[(x, row)].fg).collect();
+        assert!(filled.iter().all(|&c| c == p.ok));
+        let empty = (0..80).find(|&x| buffer[(x, row)].symbol() == "░").unwrap();
+        assert_eq!(buffer[(empty, row)].fg, p.label);
     }
 }

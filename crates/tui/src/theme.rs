@@ -168,6 +168,8 @@ pub struct Palette {
     /// `None` deja el fondo y el texto por defecto del terminal.
     pub background: Option<Color>,
     pub foreground: Option<Color>,
+    /// `None` deja el color de borde por defecto del terminal.
+    pub border: Option<Color>,
     pub title: Color,
     pub label: Color,
     pub value: Color,
@@ -183,6 +185,7 @@ impl Palette {
         Palette {
             background: None,
             foreground: None,
+            border: None,
             title: Color::Cyan,
             label: Color::DarkGray,
             value: Color::Green,
@@ -198,6 +201,7 @@ impl Palette {
         Palette {
             background: Some(theme.background.color()),
             foreground: Some(theme.foreground.color()),
+            border: Some(theme.label.color()),
             title: theme.title.color(),
             label: theme.label.color(),
             value: theme.value.color(),
@@ -218,6 +222,13 @@ impl Palette {
             style = style.fg(fg);
         }
         style
+    }
+
+    pub fn border_style(&self) -> Style {
+        match self.border {
+            Some(color) => Style::new().fg(color),
+            None => Style::new(),
+        }
     }
 
     pub fn title_style(&self) -> Style {
