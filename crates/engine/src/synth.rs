@@ -80,6 +80,11 @@ impl Synth {
             EventKind::NoteOn { note, velocity: 0 } => self.note_off(note),
             EventKind::NoteOn { note, velocity } => self.note_on(note, velocity),
             EventKind::NoteOff { note } => self.note_off(note),
+            EventKind::AllNotesOff => {
+                for voice in self.voices.iter_mut().filter(|v| v.gate()) {
+                    voice.note_off();
+                }
+            }
             EventKind::SetParam { id, value } => {
                 self.params.set(id, value);
                 if matches!(id, ParamId::Attack | ParamId::Decay | ParamId::Sustain | ParamId::Release) {
@@ -227,5 +232,16 @@ mod tests {
         let notes: Vec<Event> = (0..8).map(|i| Event::note_on(0, 48 + i, 127)).collect();
         let out = render(&mut s, &notes, 9_600);
         assert!(peak(&out) <= 1.0);
+    }
+
+    #[test]
+    fn all_notes_off_releases_every_held_note() {
+        let mut s = Synth::new(SR);
+        let notes: Vec<Event> = (0..5).map(|i| Event::note_on(0, 60 + i, 100)).collect();
+        render(&mut s, &notes, 480);
+        assert!(s.voices.iter().filter(|v| v.gate()).count() == 5);
+        render(&mut s, &[Event::all_notes_off(0)], 16);
+        assert!(!s.voices.iter().any(|v| v.gate()));
+        assert_eq!(s.active_voices(), 5, "siguen en relajación, sin cortes secos");
     }
 }

@@ -30,11 +30,15 @@ pub fn parse(bytes: &[u8]) -> Option<Midi> {
     }
 }
 
+/// CC estándar «All Notes Off».
+const ALL_NOTES_OFF_CC: u8 = 123;
+
 /// Traduce un mensaje MIDI al evento que entiende el motor.
 pub fn to_event(msg: Midi) -> Option<EventKind> {
     match msg {
         Midi::NoteOn { note, velocity } => Some(EventKind::NoteOn { note, velocity }),
         Midi::NoteOff { note } => Some(EventKind::NoteOff { note }),
+        Midi::ControlChange { controller: ALL_NOTES_OFF_CC, .. } => Some(EventKind::AllNotesOff),
         Midi::ControlChange { controller, value } => {
             let (id, value) = cc_to_param(controller, value)?;
             Some(EventKind::SetParam { id, value })
@@ -148,6 +152,14 @@ mod tests {
         assert!((max - spec.max).abs() < 1e-4);
         let (_, min) = cc_to_param(72, 0).unwrap();
         assert_eq!(min, ParamId::Release.spec().min);
+    }
+
+    #[test]
+    fn cc_123_releases_all_notes() {
+        assert_eq!(
+            to_event(Midi::ControlChange { controller: 123, value: 0 }),
+            Some(EventKind::AllNotesOff)
+        );
     }
 
     #[test]
