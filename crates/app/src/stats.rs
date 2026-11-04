@@ -28,6 +28,9 @@ pub struct Report {
     pub interval_max_load: f64,
     /// Peor callback de toda la ejecución, como fracción del tiempo de buffer.
     pub peak_load: f64,
+    /// Peor callback de toda la ejecución, en milisegundos. Si supera la
+    /// duración del buffer del dispositivo, hubo corte seguro.
+    pub peak_ms: f64,
     pub misses: u64,
     pub stream_errors: u64,
 }
@@ -64,6 +67,7 @@ impl AudioStats {
             avg_load: self.busy_ns.load(Relaxed) as f64 / played_ns as f64,
             interval_max_load: self.interval_max_ns.swap(0, Relaxed) as f64 / buffer_ns,
             peak_load: self.peak_ns.load(Relaxed) as f64 / buffer_ns,
+            peak_ms: self.peak_ns.load(Relaxed) as f64 / 1e6,
             misses: self.misses.load(Relaxed),
             stream_errors: self.stream_errors.load(Relaxed),
         }

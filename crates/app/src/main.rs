@@ -101,13 +101,14 @@ fn main() -> Result<()> {
     let r = stats.take_report(rate);
     let buffer = device_buffer.unwrap_or(r.frames_per_callback);
     println!(
-        "RESUMEN callbacks={} buffer_frames={} buffer_ms={:.2} callback_frames={} carga_media={:.1}% pico={:.1}% plazos_perdidos={} errores={}",
+        "RESUMEN callbacks={} buffer_frames={} buffer_ms={:.2} callback_frames={} carga_media={:.1}% pico={:.1}% pico_ms={:.2} plazos_perdidos={} errores={}",
         r.callbacks,
         buffer,
         buffer_ms(buffer),
         r.frames_per_callback,
         r.avg_load * 100.0,
         r.peak_load * 100.0,
+        r.peak_ms,
         r.misses,
         r.stream_errors,
     );

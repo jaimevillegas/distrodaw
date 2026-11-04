@@ -20,7 +20,7 @@ cd "$(dirname "$0")"
     for voices in 1 8 16 32 64; do
       echo "## buffer=$buffer voces=$voices"
       ./distrodaw "${args[@]}" --rate "$rate" --buffer "$buffer" --voices "$voices" --seconds "$seconds" \
-        2>&1 | grep -E 'RESUMEN|error|Error' || echo "FALLO al abrir el stream"
+        2>&1 | grep -E '^RESUMEN|^Error' || echo "FALLO al abrir el stream"
     done
   done
 } | tee "$out"
