@@ -1,0 +1,62 @@
+# DistroDAW
+
+DAW **solo MIDI** para terminal, escrito en Rust y pensado para arrancar directo
+sobre un kernel de Linux en una Raspberry Pi (objetivo inicial: Pi 2), pero
+compilable también para PC x86_64. Software libre, licencia [MIT](LICENSE):
+cópialo, modifícalo y úsalo para lo que quieras.
+
+## Estado
+
+Hito 0: una sinusoide de 440 Hz por la salida de audio por defecto.
+
+## Estructura
+
+| Crate | Función |
+|-------|---------|
+| `crates/engine` | Sintes, voces y secuenciador. Sin I/O: portable y testeable. |
+| `crates/tui`    | Interfaz de terminal (ratatui + crossterm). Pendiente. |
+| `crates/app`    | Binario `distrodaw`: audio (cpal), MIDI (midir) y eventos. |
+
+## Compilar y probar en PC
+
+Requisitos: Rust estable y, en Linux, `libasound2-dev` (Debian/Ubuntu) o
+`alsa-lib-devel` (Fedora).
+
+```sh
+cargo test -p distrodaw-engine
+cargo run --release -p distrodaw
+```
+
+## Compilar para Raspberry Pi 2 (ARMv7)
+
+```sh
+cargo install cross
+cross build --release --target armv7-unknown-linux-gnueabihf -p distrodaw
+scp target/armv7-unknown-linux-gnueabihf/release/distrodaw pi@raspberrypi.local:~
+```
+
+`cross` necesita Docker o Podman. La configuración de `libasound2` para ARM
+está en `Cross.toml`.
+
+## Principios de diseño
+
+1. **Parámetros con identidad:** cada control tiene ID, nombre, rango y valor;
+   TUI, joystick, MIDI CC y patches controlan los mismos parámetros.
+2. **Eventos con marca de tiempo** en frames dentro del buffer de audio.
+3. **Voz fija primero** (2 osciladores, filtro, 2 envolventes, LFO); el grafo
+   modular llega después.
+4. **Hilo de audio sin reservas de memoria ni locks.**
+
+## Hitos
+
+- [x] 0. Oscilador sonando en PC
+- [ ] 1. Compilar a Pi 2 y medir latencia/CPU con el Volt 2
+- [ ] 2. Teclado MIDI → sinte de 8 voces con ADSR
+- [ ] 3. TUI (Play, Synth, Seq, Files)
+- [ ] 4. Patches desde archivo (TOML)
+- [ ] 5. Secuenciador tipo tracker y grabación a .mid
+- [ ] 6. Imagen de arranque directo (Buildroot o Raspberry Pi OS Lite)
+
+## Licencia
+
+MIT. Ver [LICENSE](LICENSE).
