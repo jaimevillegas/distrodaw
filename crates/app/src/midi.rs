@@ -1,7 +1,7 @@
 //! Entrada MIDI: listado de puertos e interpretación de mensajes.
 
 use anyhow::{anyhow, bail, Result};
-use distrodaw_engine::EventKind;
+use distrodaw_engine::{EventKind, ParamId};
 use midir::{MidiInput, MidiInputPort};
 
 /// Mensaje MIDI de canal ya interpretado. Se ignora el canal (modo omni).
@@ -35,8 +35,34 @@ pub fn to_event(msg: Midi) -> Option<EventKind> {
     match msg {
         Midi::NoteOn { note, velocity } => Some(EventKind::NoteOn { note, velocity }),
         Midi::NoteOff { note } => Some(EventKind::NoteOff { note }),
-        Midi::ControlChange { .. } => None,
+        Midi::ControlChange { controller, value } => {
+            let (id, value) = cc_to_param(controller, value)?;
+            Some(EventKind::SetParam { id, value })
+        }
     }
+}
+
+/// Mapa fijo de controladores MIDI a parámetros (estándar «sound controllers»
+/// siempre que existe uno): 7 volumen, 70 forma de onda, 72 release, 73 attack,
+/// 75 decay, 79 sustain. Los tiempos usan una curva cuadrática para tener más
+/// resolución en valores cortos.
+pub fn cc_to_param(controller: u8, value: u8) -> Option<(ParamId, f32)> {
+    let id = match controller {
+        7 => ParamId::Volume,
+        70 => ParamId::Waveform,
+        72 => ParamId::Release,
+        73 => ParamId::Attack,
+        75 => ParamId::Decay,
+        79 => ParamId::Sustain,
+        _ => return None,
+    };
+    let norm = f32::from(value.min(127)) / 127.0;
+    let spec = id.spec();
+    let curved = match id {
+        ParamId::Attack | ParamId::Decay | ParamId::Release => norm * norm,
+        _ => norm,
+    };
+    Some((id, spec.min + curved * (spec.max - spec.min)))
 }
 
 /// Elige el puerto cuyo nombre contiene `filter`; sin filtro, el primero que
@@ -107,6 +133,36 @@ mod tests {
             Some(EventKind::NoteOn { note: 60, velocity: 90 })
         );
         assert_eq!(to_event(Midi::NoteOff { note: 60 }), Some(EventKind::NoteOff { note: 60 }));
+    }
+
+    #[test]
+    fn cc_maps_to_parameter_ranges() {
+        assert_eq!(cc_to_param(7, 0), Some((ParamId::Volume, 0.0)));
+        assert_eq!(cc_to_param(7, 127), Some((ParamId::Volume, 1.0)));
+        assert_eq!(cc_to_param(79, 127), Some((ParamId::Sustain, 1.0)));
+        assert_eq!(cc_to_param(70, 127), Some((ParamId::Waveform, 3.0)));
+        assert_eq!(cc_to_param(1, 64), None);
+    }
+
+    #[test]
+    fn time_parameters_use_a_quadratic_curve() {
+        let (_, half) = cc_to_param(73, 64).unwrap();
+        let spec = ParamId::Attack.spec();
+        // A media escala el ataque es mucho más corto que a mitad de rango lineal.
+        assert!(half < spec.min + 0.3 * (spec.max - spec.min));
+        let (_, max) = cc_to_param(73, 127).unwrap();
+        assert!((max - spec.max).abs() < 1e-4);
+        let (_, min) = cc_to_param(72, 0).unwrap();
+        assert_eq!(min, ParamId::Release.spec().min);
+    }
+
+    #[test]
+    fn control_change_becomes_set_param() {
+        assert_eq!(
+            to_event(Midi::ControlChange { controller: 7, value: 127 }),
+            Some(EventKind::SetParam { id: ParamId::Volume, value: 1.0 })
+        );
+        assert_eq!(to_event(Midi::ControlChange { controller: 1, value: 10 }), None);
     }
 
     #[test]
