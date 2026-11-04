@@ -1,0 +1,19 @@
+# Configuración del kiosco de DistroDAW. Copia este archivo a `kiosk.conf`
+# (junto al binario `distrodaw`) y edítalo; no hace falta sudo.
+
+# Tema de color: un archivo de themes/ (dracula, solarized-dark, gruvbox-dark, nord)
+THEME=dracula
+
+# Fuente del terminal gráfico y su tamaño (más grande = letras más grandes)
+FONT="JetBrains Mono"
+FONT_SIZE=13
+
+# Argumentos de audio, ANTES del subcomando (ver `distrodaw devices`)
+AUDIO_ARGS="--device plughw:CARD=V2,DEV=0 --rate 48000 --buffer 128"
+
+# Argumentos de la interfaz (ver `distrodaw tui --help`)
+TUI_ARGS="--midi Keystation --patch patches/organ.toml"
+
+# Si cage falla al arrancar con el renderizador de GPU, descomenta esta línea
+# para usar el renderizador por software:
+# export WLR_RENDERER=pixman
