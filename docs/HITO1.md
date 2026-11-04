@@ -80,31 +80,31 @@ También se puede lanzar una prueba suelta:
 
 Medido el 2026-11-03 en una Pi 2 (ARMv7, Raspberry Pi OS 13 «trixie», 32 bits)
 con el Volt 2 por `hw:CARD=V2,DEV=0` (I16, 2 canales) a 48 kHz, con el
-gobernador `ondemand` (900 MHz). 5 s por prueba, sinusoides con `sin()`.
+gobernador `performance` (900 MHz fijos). 5 s por prueba, sinusoides con `sin()`.
 Plazos perdidos y errores: 0 en todas las pruebas.
 
 | Buffer (frames) | ms | Voces | Carga media | Pico (ms) |
 |-----------------|----|-------|-------------|-----------|
-| 64  | 1.33 | 1  | 1.4 %  | 0.12 |
-| 64  | 1.33 | 8  | 8.2 %  | 0.15 |
-| 64  | 1.33 | 16 | 15.3 % | 0.21 |
-| 64  | 1.33 | 32 | 25.7 % | 0.37 |
-| 64  | 1.33 | 64 | 51.2 % | 0.69 |
-| 128 | 2.67 | 1  | 1.6 %  | 0.14 |
-| 128 | 2.67 | 8  | 8.3 %  | 0.27 |
-| 128 | 2.67 | 16 | 16.0 % | 0.55 |
-| 128 | 2.67 | 32 | 31.2 % | 0.70 |
+| 64  | 1.33 | 1  | 1.1 % | 0.06 |
+| 64  | 1.33 | 8  | 6.4 % | 0.14 |
+| 64  | 1.33 | 16 | 12.6 % | 0.22 |
+| 64  | 1.33 | 32 | 24.8 % | 0.48 |
+| 64  | 1.33 | 64 | 51.4 % | 0.71 |
+| 128 | 2.67 | 1  | 1.0 % | 0.08 |
+| 128 | 2.67 | 8  | 6.4 % | 0.22 |
+| 128 | 2.67 | 16 | 12.5 % | 0.38 |
+| 128 | 2.67 | 32 | 25.1 % | 0.70 |
 | 128 | 2.67 | 64 | 50.0 % | 1.33 |
-| 256 | 5.33 | 1  | 1.5 %  | 0.11 |
-| 256 | 5.33 | 8  | 8.7 %  | 0.39 |
-| 256 | 5.33 | 16 | 16.2 % | 0.70 |
-| 256 | 5.33 | 32 | 31.6 % | 1.38 |
-| 256 | 5.33 | 64 | 50.8 % | 2.74 |
+| 256 | 5.33 | 1  | 1.0 % | 0.11 |
+| 256 | 5.33 | 8  | 6.5 % | 0.39 |
+| 256 | 5.33 | 16 | 12.5 % | 0.71 |
+| 256 | 5.33 | 32 | 25.2 % | 1.35 |
+| 256 | 5.33 | 64 | 50.9 % | 2.67 |
 
 Lectura:
 
-- Una sinusoide cuesta cerca de un 0,8 % de CPU. Con 64 voces la carga media es
-  del 50 % y el peor callback (0,69 a 2,74 ms) cabe en el buffer en todos los casos.
+- Una sinusoide cuesta cerca de un 0,8 % de CPU (a 900 MHz fijos). Con 64 voces la carga media es
+  del 50 % y el peor callback (0,71 a 2,67 ms) cabe en el buffer en todos los casos.
 - Los buffers de 64 y 128 frames funcionan sin cortes, así que el criterio de
   latencia del hito (64 a 128 frames a 48 kHz, 1,3 a 2,7 ms de buffer) se cumple.
 - Una voz real (2 osciladores, filtro, 2 envolventes, LFO) costará varias veces
@@ -119,11 +119,13 @@ ya hay plazos perdidos.
 
 ### Avisos
 
-- **Subtensión:** `vcgencmd get_throttled` da `0x50000` (hubo subtensión y
-  limitación de CPU desde el arranque). El kernel la registró al conectar el
-  Volt 2. Conviene una fuente de 5 V / 2,5 A o un hub con alimentación propia
-  antes de dar estas cifras por definitivas.
-- **CPU a frecuencia fija:** el gobernador `performance` necesita `sudo`; las
-  cifras se midieron con `ondemand`.
+- **Subtensión:** `vcgencmd get_throttled` da `0x50000`: son banderas que
+  quedan marcadas desde el arranque (hubo subtensión y limitación de CPU, el
+  kernel la registró al conectar el Volt 2); los bits de estado actual están a
+  0. Aun así, conviene una fuente de 5 V / 2,5 A o un hub con alimentación
+  propia antes de dar estas cifras por definitivas.
+- **Gobernador:** con `performance` la carga baja respecto a `ondemand`
+  (p. ej. 8 voces: 6,4 % frente a 8,2 %), porque la CPU no pierde tiempo
+  subiendo de frecuencia. Se pierde al reiniciar.
 - **No medido:** latencia de ida y vuelta (requiere loopback) y comportamiento
   con teclado MIDI, joystick y demás dispositivos USB conectados a la vez.
