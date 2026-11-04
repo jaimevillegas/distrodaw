@@ -3,8 +3,8 @@
 Objetivo (ver `SPEC.md`): pantallas Play y Synth con medidores y edición de
 parámetros; entrada de teclado y joystick.
 
-**Estado:** teclado listo y probado; **el joystick queda pendiente** hasta tener
-uno para probarlo en la Pi (ver «Pendiente»).
+**Estado:** hecho con teclado, probado en la Pi 2 por HDMI y por SSH. El
+**joystick queda como opcional para el futuro** (ver «Opcional»).
 
 ## Uso
 
@@ -73,14 +73,16 @@ distingue Mayús + flechas. La forma de onda cambia de uno en uno. Los tiempos
 - [x] Pi 2 con el Volt 2 (buffer 128, 48 kHz): carga de CPU ≈ 1 %, 0 xruns con la
       interfaz abierta.
 
+- [x] **SSH** desde un terminal real: comprobado a mano por el autor.
 - [x] **Consola del kernel por HDMI** en la Pi 2, con monitor y teclado USB (comprobado
       a mano por el autor): la interfaz funciona y los símbolos ▓ ░ ■ □ ▶ se ven bien.
 
-## Pendiente
+## Opcional (futuro)
 
-- [ ] **Joystick / gamepad (`gilrs`):** no hay ninguno para probar; se añadirá como
-      otra fuente de `Action` sin tocar la interfaz.
-- [ ] Probarla por **SSH** desde un terminal real (hasta ahora solo en un pty de prueba).
+- [ ] **Joystick / gamepad (`gilrs`):** se decidió dejarlo para más adelante; se
+      añadirá como otra fuente de `Action` sin tocar la interfaz.
+
+## Pendiente
 - [ ] Mensajes de `libasound` por `stderr`: salen al enumerar dispositivos al
       arrancar (antes de abrir la pantalla); no se han visto durante el uso.
 - [ ] Pantallas Seq, Song y Files (hitos 4 y 5).

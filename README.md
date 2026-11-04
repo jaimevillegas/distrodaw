@@ -15,8 +15,8 @@ Hito 2 implementado: sinte polifónico de 8 voces con ADSR y parámetros con ID,
 controlado por teclado MIDI (`distrodaw play`). Probado con un puerto MIDI virtual y
 con un teclado USB real en la Pi 2; pendiente medir la latencia real. Ver [docs/HITO2.md](docs/HITO2.md).
 
-Hito 3 en curso: interfaz de terminal con pantallas Play y Synth (`distrodaw`), manejada
-con teclado; el joystick queda pendiente. Ver [docs/HITO3.md](docs/HITO3.md).
+Hito 3 completado: interfaz de terminal con pantallas Play y Synth (`distrodaw`), manejada
+con teclado (el joystick queda como opcional para el futuro). Ver [docs/HITO3.md](docs/HITO3.md).
 
 ## Estructura
 
@@ -65,7 +65,7 @@ está en `Cross.toml`.
 - [x] 0. Oscilador sonando en PC
 - [x] 1. Compilar a Pi 2 y medir latencia/CPU con el Volt 2
 - [x] 2. Teclado MIDI → sinte de 8 voces con ADSR
-- [ ] 3. TUI (Play, Synth, Seq, Files)
+- [x] 3. TUI (Play, Synth; joystick opcional más adelante)
 - [ ] 4. Patches desde archivo (TOML)
 - [ ] 5. Secuenciador tipo tracker y grabación a .mid
 - [ ] 6. Imagen de arranque directo (Buildroot o Raspberry Pi OS Lite)
