@@ -9,13 +9,13 @@ use crate::session::{self, AudioEvent, Mode, Session};
 use anyhow::Result;
 use clap::{Args, ValueEnum};
 use distrodaw_engine::Patch;
-use distrodaw_tui::{next_action, ColorMode, FileRequest, Palette, Realtime, Tui, UiState};
+use distrodaw_tui::{next_action, Action, ColorMode, FileRequest, Palette, Realtime, Tui, UiState};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
-/// Cuadro de la interfaz: unos 30 por segundo.
-const FRAME: Duration = Duration::from_millis(33);
+/// Cuadro de la interfaz: 25 por segundo. Solo se pinta si algo visible cambió.
+const FRAME: Duration = Duration::from_millis(40);
 /// Cada cuánto se vuelve a leer la lista de patches de la carpeta.
 const REFRESH_FILES: Duration = Duration::from_secs(1);
 /// Nombre del patch sin nombre propio; al guardarlo se usa el del archivo.
@@ -155,6 +155,9 @@ pub fn run(audio_args: &AudioArgs, args: &TuiArgs) -> Result<()> {
         tui.draw(&state)?;
 
         if let Some(action) = next_action(FRAME)? {
+            if action == Action::Redraw {
+                tui.invalidate();
+            }
             if let Some(edit) = state.apply(action) {
                 // Si la cola está llena se pierde este paso; el siguiente lo recupera.
                 let _ = session.ui_tx.push(distrodaw_engine::Event::set_param(0, edit.id, edit.value));
